@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixelbound</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #101827; color: #f4f7ff; font-family: system-ui, sans-serif;
+    overflow: hidden;
+  }
+  #wrap { width: min(100vw, 1280px); padding: 10px; }
+  canvas {
+    display: block; width: 100%; height: auto; aspect-ratio: 16 / 9;
+    background: #8bd8ed; border: 2px solid #26374d; border-radius: 8px;
+    image-rendering: pixelated; touch-action: none;
+  }
+  #hint { text-align: center; color: #aebdd1; font-size: 12px; padding-top: 8px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="540" aria-label="Pixelbound platform game"></canvas>
+  <div id="hint">A / D or ← / → to move · Space / W / ↑ to jump twice · Esc to pause</div>
+</div>
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const GRAVITY = 0.62;
+  const keys = Object.create(null);
+  let state = "menu";
+  let menuSelection = 0;
+  let controlsReturn = "menu";
+  let worldIndex = 0;
+  let world = null;
+  let cameraX = 0;
+  let lives = 3;
+  let shards = 0;
+  let particles = [];
+  let message = "";
+  let messageTimer = 0;
+  let lastTime = 0;
+  let jumpQueued = false;
+  let pointerStart = null;
+
+  const worlds = [
+    {
+      name: "VERDANT REACH",
+      sky: ["#83d9ed", "#e8f8ff"], hill: "#65b4a0", farHill: "#5c9cae",
+      length: 3000,
+      platforms: [
+        [0,470,510,70], [570,470,320,70], [960,470,300,70],
+        [1330,470,410,70], [1810,470,340,70], [2220,470,780,70],
+        [180,390,120,18], [360,330,125,18], [620,390,120,18],
+        [770,325,125,18], [1010,390,130,18], [1170,325,130,18],
+        [1400,390,135,18], [1580,320,135,18], [1880,390,130,18],
+        [2040,325,130,18], [2310,390,130,18], [2490,320,145,18],
+        [2700,390,130,18]
+      ],
+      spikes: [[420,446,54,24],[700,446,52,24],[1080,446,52,24],[1510,446,52,24],[1950,446,52,24],[2390,446,52,24]],
+      checkpoints: [[1320,390],[2220,390]],
+      shards: [[210,350],[405,290],[660,350],[815,285],[1055,350],[1215,285],[1450,350],[1630,280],[1920,350],[2080,285],[2350,350],[2545,280],[2740,350]],
+      enemies: [
+        {type:"walker",x:330,y:438,min:300,max:490,speed:1.1},
+        {type:"hopper",x:810,y:293,min:770,max:875,speed:1.15},
+        {type:"flyer",x:1080,y:265,min:1000,max:1220,speed:1.5},
+        {type:"walker",x:1460,y:438,min:1360,max:1690,speed:1.25},
+        {type:"hopper",x:1940,y:353,min:1885,max:1990,speed:1.1},
+        {type:"flyer",x:2430,y:250,min:2300,max:2630,speed:1.65}
+      ],
+      portal: [2860,390]
+    },
+    {
+      name: "HOLLOWDEEP",
+      sky: ["#263653", "#7184a4"], hill: "#384d67", farHill: "#304058",
+      length: 3000,
+      platforms: [
+        [0,470,350,70], [420,470,300,70], [800,470,280,70],
+        [1160,470,310,70], [1540,470,300,70], [1920,470,350,70],
+        [2350,470,650,70], [130,390,120,18], [310,325,120,18],
+        [500,380,125,18], [680,310,120,18], [870,380,120,18],
+        [1030,310,130,18], [1240,380,130,18], [1410,305,130,18],
+        [1610,380,130,18], [1770,315,130,18], [1990,380,130,18],
+        [2160,310,130,18], [2400,380,130,18], [2580,310,130,18],
+        [2770,385,120,18]
+      ],
+      spikes: [[270,446,48,24],[570,446,52,24],[930,446,52,24],[1300,446,52,24],[1670,446,52,24],[2050,446,52,24],[2480,446,52,24]],
+      checkpoints: [[1160,390],[1920,390]],
+      shards: [[165,350],[350,285],[540,345],[720,270],[910,345],[1080,270],[1280,345],[1450,265],[1650,345],[1810,275],[2030,345],[2200,270],[2440,345],[2620,270],[2810,350]],
+      enemies: [
+        {type:"hopper",x:540,y:348,min:500,max:610,speed:1.3},
+        {type:"flyer",x:910,y:240,min:820,max:1100,speed:1.7},
+        {type:"walker",x:1250,y:438,min:1180,max:1430,speed:1.3},
+        {type:"hopper",x:1660,y:348,min:1610,max:1730,speed:1.3},
+        {type:"flyer",x:2080,y:245,min:1990,max:2280,speed:1.8},
+        {type:"walker",x:2450,y:438,min:2380,max:2700,speed:1.4}
+      ],
+      portal: [2860,385]
+    },
+    {
+      name: "THE SHATTERED CROWN",
+      sky: ["#302a54", "#d28e9c"], hill: "#6c547f", farHill: "#51476f",
+      length: 3150,
+      platforms: [
+        [0,470,300,70], [370,470,260,70], [700,470,260,70],
+        [1040,470,280,70], [1400,470,260,70], [1740,470,280,70],
+        [2100,470,300,70], [2470,470,680,70],
+        [110,390,115,18], [270,320,120,18], [440,380,120,18],
+        [600,300,120,18], [770,375,120,18], [930,300,120,18],
+        [1100,375,120,18], [1260,300,120,18], [1450,375,120,18],
+        [1610,300,120,18], [1800,375,120,18], [1970,300,120,18],
+        [2160,375,120,18], [2330,300,120,18], [2520,375,120,18],
+        [2700,300,130,18], [2900,375,120,18]
+      ],
+      spikes: [[215,446,48,24],[485,446,52,24],[805,446,52,24],[1140,446,52,24],[1490,446,52,24],[1840,446,52,24],[2200,446,52,24],[2580,446,52,24]],
+      checkpoints: [[1400,390],[2100,390]],
+      shards: [[145,350],[310,280],[480,340],[640,260],[810,335],[970,260],[1140,335],[1300,260],[1490,335],[1650,260],[1840,335],[2010,260],[2200,335],[2370,260],[2560,335],[2740,260],[2940,335]],
+      enemies: [
+        {type:"walker",x:440,y:438,min:390,max:590,speed:1.45},
+        {type:"flyer",x:820,y:235,min:730,max:980,speed:1.9},
+        {type:"hopper",x:1140,y:343,min:1100,max:1210,speed:1.5},
+        {type:"flyer",x:1510,y:235,min:1420,max:1690,speed:2},
+        {type:"hopper",x:1850,y:343,min:1800,max:1910,speed:1.5},
+        {type:"flyer",x:2200,y:235,min:2110,max:2400,speed:2.1},
+        {type:"walker",x:2580,y:438,min:2500,max:2800,speed:1.5}
+      ],
+      portal: [3010,375]
+    }
+  ];
+
+  const player = {
+    x: 60, y: 410, w: 28, h: 42, vx: 0, vy: 0,
+    speed: 4.4, onGround: false, jumpsLeft: 2, facing: 1,
+    invulnerable: 0, anim: 0, checkpointX: 60, checkpointY: 410
+  };
+
+  function cloneWorld(index) {
+    const src = worlds[index];
+    return {
+      ...src,
+      platforms: src.platforms.map(p => ({x:p[0],y:p[1],w:p[2],h:p[3]})),
+      spikes: src.spikes.map(s => ({x:s[0],y:s[1],w:s[2],h:s[3]})),
+      checkpoints: src.checkpoints.map(c => ({x:c[0],y:c[1],active:false,used:false})),
+      shards: src.shards.map(s => ({x:s[0],y:s[1],taken:false})),
+      enemies: src.enemies.map(e => ({...e, w:e.type==="flyer"?34:30,h:e.type==="flyer"?24:30,dir:1,alive:true,baseY:e.y,phase:Math.random()*6})),
+      portal: {x:src.portal[0],y:src.portal[1],w:44,h:80}
+    };
+  }
+
+  function startGame() {
+    lives = 3;
+    shards = 0;
+    worldIndex = 0;
+    loadWorld(0, true);
+    state = "playing";
+    message = "Find the portal. Use your double jump!";
+    messageTimer = 240;
+  }
+
+  function loadWorld(index, fresh = false) {
+    worldIndex = index;
+    world = cloneWorld(index);
+    cameraX = 0;
+    player.x = 60; player.y = 410; player.vx = 0; player.vy = 0;
+    player.onGround = false; player.jumpsLeft = 2; player.invulnerable = 60;
+    player.checkpointX = 60; player.checkpointY = 410;
+    particles = [];
+    if (!fresh) {
+      message = world.name;
+      messageTimer = 150;
+    }
+  }
+
+  function rects(a,b) {
+    return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+  }
+
+  function spawnBurst(x,y,color,count=10) {
+    for (let i=0;i<count;i++) {
+      particles.push({x,y,vx:(Math.random()-.5)*5,vy:(Math.random()-.7)*5,life:25+Math.random()*20,color,size:2+Math.random()*3});
+    }
+  }
+
+  function queueJump() { jumpQueued = true; }
+
+  window.addEventListener("keydown", e => {
+    if (["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();
+    if (!keys[e.code]) {
+      if (["Space","KeyW","ArrowUp"].includes(e.code)) queueJump();
+      if (e.code === "Escape") {
+        if (state === "playing") state = "paused";
+        else if (state === "paused") state = "playing";
+        else if (state === "controls") state = controlsReturn;
+      }
+      if (e.code === "Enter" || e.code === "Space") {
+        if (state === "menu") activateMenu();
+        else if (state === "gameover" || state === "victory") state = "menu";
+        else if (state === "controls") state = controlsReturn;
+        else if (state === "paused") state = "playing";
+      }
+      if (state === "menu" && (e.code === "ArrowUp" || e.code === "ArrowDown")) menuSelection = 1-menuSelection;
+    }
+    keys[e.code] = true;
+  });
+  window.addEventListener("keyup", e => { keys[e.code] = false; });
+  window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && state==="playing") state="paused"; });
+
+  function activateMenu() {
+    if (menuSelection === 0) startGame();
+    else {
+      controlsReturn = "menu";
+      state = "controls";
+    }
+  }
+
+  function pointerPos(e) {
+    const r = canvas.getBoundingClientRect();
+    return {x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    const p = pointerPos(e);
+    pointerStart = p;
+    if (state === "menu") {
+      if (p.y > 285 && p.y < 350) { menuSelection=0; activateMenu(); }
+      else if (p.y >= 350 && p.y < 415) { menuSelection=1; activateMenu(); }
+      return;
+    }
+    if (state === "controls") { state=controlsReturn; return; }
+    if (state === "paused") {
+      if (p.y > 280 && p.y < 350) state="playing";
+      else if (p.y >= 350 && p.y < 420) state="menu";
+      return;
+    }
+    if (state === "gameover" || state === "victory") { state="menu"; return; }
+    if (state === "playing") {
+      if (p.y > H-105) {
+        if (p.x < W*0.29) keys.ArrowLeft=true;
+        else if (p.x < W*0.48) keys.ArrowRight=true;
+        else if (p.x > W*0.70) queueJump();
+      } else if (p.x > W-90 && p.y < 70) {
+        state="paused";
+      } else if (p.x > W-170 && p.y < 70) {
+        queueJump();
+      }
+    }
+  });
+  canvas.addEventListener("pointerup", e => {
+    if (pointerStart) {
+      keys.ArrowLeft=false; keys.ArrowRight=false;
+    }
+    pointerStart=null;
+  });
+  canvas.addEventListener("pointercancel", () => {
+    keys.ArrowLeft=false; keys.ArrowRight=false; pointerStart=null;
+  });
+
+  function hurt() {
+    if (player.invulnerable > 0) return;
+    lives--;
+    spawnBurst(player.x+player.w/2,player.y+player.h/2,"#ff6b75",18);
+    if (lives <= 0) {
+      state="gameover";
+      return;
+    }
+    player.x=player.checkpointX;
+    player.y=player.checkpointY;
+    player.vx=0; player.vy=0; player.jumpsLeft=2; player.onGround=false;
+    player.invulnerable=110;
+    cameraX=Math.max(0,player.x-W*0.35);
+    message="Back to the checkpoint";
+    messageTimer=100;
+  }
+
+  function update(dt) {
+    if (state !== "playing") {
+      particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.life--;});
+      particles=particles.filter(p=>p.life>0);
+      return;
+    }
+    const step=Math.min(2,dt/16.667);
+    player.anim += step;
+    if (player.invulnerable>0) player.invulnerable-=step;
+    if (messageTimer>0) messageTimer-=step;
+
+    const left=keys.ArrowLeft||keys.KeyA;
+    const right=keys.ArrowRight||keys.KeyD;
+    player.vx=(right?1:0)-(left?1:0);
+    player.vx*=player.speed;
+    if (player.vx) player.facing=Math.sign(player.vx);
+
+    if (jumpQueued) {
+      if (player.jumpsLeft>0) {
+        player.vy = player.jumpsLeft===2 ? -13.3 : -12.4;
+        player.jumpsLeft--;
+        player.onGround=false;
+        spawnBurst(player.x+player.w/2,player.y+player.h,"#f4f7ff",5);
+      }
+      jumpQueued=false;
+    }
+
+    const oldY=player.y;
+    player.x += player.vx*step;
+    player.x=Math.max(0,Math.min(world.length-player.w,player.x));
+    player.vy += GRAVITY*step;
+    player.y += player.vy*step;
+    player.onGround=false;
+
+    // Platforms are solid from above: landing restores both jumps.
+    for (const p of world.platforms) {
+      if (player.x+player.w>p.x && player.x<p.x+p.w &&
+          oldY+player.h<=p.y+5 && player.y+player.h>=p.y &&
+          player.vy>=0) {
+        player.y=p.y-player.h;
+        player.vy=0;
+        player.onGround=true;
+        player.jumpsLeft=2;
+      }
+    }
+
+    // Stop upward motion against the underside of platforms.
+    if (player.vy<0) {
+      for (const p of world.platforms) {
+        if (player.x+player.w>p.x && player.x<p.x+p.w &&
+            oldY>=p.y+p.h-2 && player.y<=p.y+p.h) {
+          player.y=p.y+p.h;
+          player.vy=0;
+        }
+      }
+    }
+
+    // Walkers patrol, hoppers jump, and flyers bob through the air.
+    for (const e of world.enemies) {
+      if (!e.alive) continue;
+      e.phase+=0.055*step;
+      if (e.type==="flyer") {
+        e.x+=e.speed*e.dir*step;
+        e.y=e.baseY+Math.sin(e.phase*2)*15;
+      } else {
+        e.x+=e.speed*e.dir*step;
+        if (e.type==="hopper" && Math.random()<0.018*step && e.y>=e.baseY-2) e.vy=-7.5;
+        if (e.type==="hopper") {
+          e.vy=(e.vy||0)+0.48*step;
+          e.y+=e.vy*step;
+          const floor=world.platforms.filter(p=>e.x+e.w>p.x && e.x<p.x+p.w && e.y+e.h<=p.y+18).sort((a,b)=>a.y-b.y)[0];
+          if (floor && e.y+e.h>=floor.y) {e.y=floor.y-e.h;e.vy=0;e.baseY=e.y;}
+        }
+      }
+      if (e.x<e.min) {e.x=e.min;e.dir=1;}
+      if (e.x+e.w>e.max) {e.x=e.max-e.w;e.dir=-1;}
+      if (rects(player,e)) {
+        if (player.vy>1 && oldY+player.h<=e.y+12 && e.type!=="flyer") {
+          e.alive=false;
+          player.vy=-8.5;
+          player.jumpsLeft=Math.max(player.jumpsLeft,1);
+          shards+=2;
+          spawnBurst(e.x+e.w/2,e.y+e.h/2,"#ffd166",14);
+        } else if (player.invulnerable<=0) {
+          hurt();
+        }
+      }
+    }
+
+    // Spikes and falls are dangerous.
+    for (const s of world.spikes) {
+      if (rects(player,{x:s.x,y:s.y+7,w:s.w,h:s.h-7})) { hurt(); break; }
+    }
+    if (player.y>H+200) hurt();
+
+    // Collect shards.
+    for (const s of world.shards) {
+      if (!s.taken && rects(player,{x:s.x-10,y:s.y-10,w:20,h:20})) {
+        s.taken=true; shards++;
+        spawnBurst(s.x,s.y,"#7df9ff",9);
+      }
+    }
+
+    // Checkpoints activate when touched.
+    for (const cp of world.checkpoints) {
+      if (rects(player,{x:cp.x,y:cp.y-62,w:30,h:80})) {
+        if (!cp.active) {
+          cp.active=true;
+          player.checkpointX=cp.x+18;
+          player.checkpointY=cp.y-player.h;
+          player.jumpsLeft=2;
+          spawnBurst(cp.x+12,cp.y-42,"#8dffb0",14);
+          message="Checkpoint reached";
+          messageTimer=110;
+        }
+      }
+    }
+
+    if (rects(player,world.portal)) {
+      if (worldIndex<worlds.length-1) loadWorld(worldIndex+1);
+      else state="victory";
+    }
+
+    const target=Math.max(0,Math.min(world.length-W,player.x-W*0.36));
+    cameraX+=(target-cameraX)*0.12;
+    particles.forEach(p=>{p.x+=p.vx*step;p.y+=p.vy*step;p.vy+=.12*step;p.life-=step;});
+    particles=particles.filter(p=>p.life>0);
+  }
+
+  function drawBackground() {
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,world?world.sky[0]:"#83d9ed");
+    g.addColorStop(1,world?world.sky[1]:"#e8f8ff");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    // Sun / distant glow
+    ctx.globalAlpha=.8;ctx.fillStyle="#fff2bd";ctx.beginPath();ctx.arc(790,95,34,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+
+    // Parallax mountain silhouettes.
+    for (let layer=0;layer<2;layer++) {
+      const speed=layer===0?.14:.28;
+      ctx.fillStyle=layer===0?(world?world.farHill:"#8bc9c9"):(world?world.hill:"#65b4a0");
+      ctx.beginPath();ctx.moveTo(0,H);
+      const offset=-(cameraX*speed)%260;
+      for(let x=offset-260;x<W+260;x+=130){
+        const peak=layer===0?210:290;
+        ctx.lineTo(x,peak+Math.sin((x+cameraX*speed)*.013+layer)*35);
+        ctx.lineTo(x+65,peak+70+Math.cos((x+cameraX*speed)*.009)*25);
+      }
+      ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+    }
+    // Clouds
+    ctx.fillStyle="rgba(255,255,255,.55)";
+    for(let i=0;i<7;i++){
+      const x=((i*190-cameraX*.12)%(W+180)+W+180)%(W+180)-60;
+      const y=55+(i%3)*48;
+      ctx.beginPath();ctx.ellipse(x,y,32,12,0,0,Math.PI*2);ctx.ellipse(x+22,y-7,23,17,0,0,Math.PI*2);ctx.ellipse(x+43,y,28,12,0,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  function drawPlatform(p) {
+    const x=Math.round(p.x-cameraX);
+    if(x+p.w<0||x>W)return;
+    ctx.fillStyle="#493f42";ctx.fillRect(x,p.y,p.w,p.h);
+    ctx.fillStyle=worldIndex===1?"#9ba5bd":worldIndex===2?"#b78ca6":"#7dba78";
+    ctx.fillRect(x,p.y,p.w,6);
+    ctx.fillStyle="rgba(255,255,255,.12)";
+    for(let tx=x+12;tx<x+p.w;tx+=32)ctx.fillRect(tx,p.y+15,10,3);
+    ctx.fillStyle="rgba(0,0,0,.15)";ctx.fillRect(x,p.y+p.h-5,p.w,5);
+  }
+
+  function drawSpike(s) {
+    const x=s.x-cameraX;
+    if(x+s.w<0||x>W)return;
+    const count=Math.max(2,Math.floor(s.w/13));
+    ctx.fillStyle="#d94c61";ctx.strokeStyle="#7d293c";ctx.lineWidth=2;
+    for(let i=0;i<count;i++){
+      const sx=x+i*s.w/count, sw=s.w/count;
+      ctx.beginPath();ctx.moveTo(sx,s.y+s.h);ctx.lineTo(sx+sw/2,s.y+3);ctx.lineTo(sx+sw,s.y+s.h);ctx.closePath();ctx.fill();ctx.stroke();
+    }
+  }
+
+  function drawPlayer() {
+    if(player.invulnerable>0 && Math.floor(player.invulnerable/6)%2===0)return;
+    const x=Math.round(player.x-cameraX),y=Math.round(player.y);
+    // Shadow
+    ctx.fillStyle="rgba(18,29,44,.18)";ctx.beginPath();ctx.ellipse(x+player.w/2,y+player.h+2,17,4,0,0,Math.PI*2);ctx.fill();
+    // Legs
+    ctx.fillStyle="#283b61";
+    const run=Math.sin(player.anim*.25)*(Math.abs(player.vx)>0?4:0);
+    ctx.fillRect(x+5,y+30,7,11+run);ctx.fillRect(x+17,y+30,7,11-run);
+    // Body and jacket
+    ctx.fillStyle="#f4f4f4";ctx.fillRect(x+3,y+13,22,22);
+    ctx.fillStyle="#e76f51";ctx.fillRect(x+3,y+16,22,15);
+    ctx.fillStyle="#f0bd8b";ctx.fillRect(x+5,y+1,19,16);
+    ctx.fillStyle="#26344c";ctx.fillRect(x+3,y,23,7);
+    ctx.fillStyle="#1d2a3d";
+    const eyeX=player.facing>0?x+18:x+7;
+    ctx.fillRect(eyeX,y+7,3,3);
+    ctx.fillStyle="#f8d56b";ctx.fillRect(x+10,y+20,8,4);
+  }
+
+  function drawEnemy(e) {
+    if(!e.alive)return;
+    const x=Math.round(e.x-cameraX),y=Math.round(e.y);
+    if(x+e.w<0||x>W)return;
+    if(e.type==="flyer"){
+      ctx.fillStyle="#594a91";
+      ctx.beginPath();ctx.moveTo(x+17,y+10);ctx.lineTo(x-5,y+Math.sin(e.phase)*8);ctx.lineTo(x+5,y+20);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(x+17,y+10);ctx.lineTo(x+38,y+Math.cos(e.phase)*8);ctx.lineTo(x+29,y+20);ctx.closePath();ctx.fill();
+      ctx.fillStyle="#b4a7ff";ctx.fillRect(x+7,y+4,20,17);
+      ctx.fillStyle="#25253f";ctx.fillRect(x+10,y+10,4,4);ctx.fillRect(x+21,y+10,4,4);
+    } else {
+      ctx.fillStyle=e.type==="hopper"?"#d78a48":"#5b9a66";
+      ctx.fillRect(x+2,y+5,26,23);
+      ctx.fillStyle=e.type==="hopper"?"#f0b968":"#8bd78c";
+      ctx.fillRect(x+5,y,20,14);
+      ctx.fillStyle="#202a37";ctx.fillRect(x+8,y+6,4,4);ctx.fillRect(x+19,y+6,4,4);
+      ctx.fillStyle="#273448";ctx.fillRect(x+5,y+26,7,4);ctx.fillRect(x+20,y+26,7,4);
+    }
+  }
+
+  function drawCollectible(s) {
+    if(s.taken)return;
+    const x=s.x-cameraX,y=s.y;
+    const pulse=Math.sin(performance.now()*.006+s.x)*2;
+    ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);
+    ctx.fillStyle="#7df9ff";ctx.fillRect(-7-pulse/2,-7-pulse/2,14+pulse,14+pulse);
+    ctx.fillStyle="#eaffff";ctx.fillRect(-3,-5,4,8);ctx.restore();
+  }
+
+  function drawCheckpoint(cp) {
+    const x=cp.x-cameraX;
+    ctx.fillStyle="#594d52";ctx.fillRect(x,cp.y-58,5,60);
+    ctx.fillStyle=cp.active?"#75f0a2":"#d7dce8";
+    ctx.beginPath();ctx.moveTo(x+5,cp.y-57);ctx.lineTo(x+31,cp.y-47);ctx.lineTo(x+5,cp.y-36);ctx.closePath();ctx.fill();
+    if(cp.active){ctx.fillStyle="#b5ffd0";ctx.beginPath();ctx.arc(x+2,cp.y-59,5,0,Math.PI*2);ctx.fill();}
+  }
+
+  function drawPortal() {
+    const p=world.portal,x=p.x-cameraX,y=p.y-70;
+    ctx.save();ctx.shadowBlur=20;ctx.shadowColor="#8df7ff";
+    ctx.strokeStyle="#c8fbff";ctx.lineWidth=5;
+    ctx.beginPath();ctx.ellipse(x+p.w/2,y+42,p.w/2,40,0,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle="rgba(93,235,255,.25)";ctx.beginPath();ctx.ellipse(x+p.w/2,y+42,p.w/2-4,36,0,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+    ctx.fillStyle="#f5ffff";ctx.font="bold 11px system-ui";ctx.textAlign="center";ctx.fillText("EXIT",x+p.w/2,y+45);
+  }
+
+  function drawHUD() {
+    ctx.fillStyle="rgba(16,24,39,.76)";ctx.fillRect(14,14,330,56);
+    ctx.fillStyle="#f4f7ff";ctx.font="bold 17px system-ui";ctx.textAlign="left";
+    ctx.fillText(world.name,26,36);
+    ctx.font="13px system-ui";ctx.fillStyle="#c6d7e9";
+    ctx.fillText("Shards: "+shards+"     Lives: "+"♥ ".repeat(Math.max(0,lives)).trim(),26,57);
+    ctx.fillStyle="rgba(16,24,39,.7)";ctx.fillRect(W-160,14,146,34);
+    ctx.fillStyle="#f4f7ff";ctx.font="13px system-ui";ctx.textAlign="center";
+    ctx.fillText("Jumps: "+(player.jumpsLeft===2?"2 / 2":player.jumpsLeft===1?"1 / 2":"0 / 2"),W-87,36);
+    ctx.textAlign="left";
+    if(messageTimer>0&&message){
+      ctx.font="bold 17px system-ui";ctx.textAlign="center";
+      ctx.fillStyle="rgba(16,24,39,.7)";ctx.fillRect(W/2-170,82,340,34);
+      ctx.fillStyle="#fff";ctx.fillText(message,W/2,104);ctx.textAlign="left";
+    }
+    // Touch controls are visible on smaller / touch screens.
+    if(matchMedia("(pointer: coarse)").matches){
+      ctx.globalAlpha=.55;
+      ctx.fillStyle="#17263b";
+      ctx.beginPath();ctx.roundRect(18,H-83,65,65,14);ctx.fill();
+      ctx.beginPath();ctx.roundRect(91,H-83,65,65,14);ctx.fill();
+      ctx.beginPath();ctx.roundRect(W-91,H-83,73,65,14);ctx.fill();
+      ctx.fillStyle="#fff";ctx.font="bold 28px system-ui";ctx.textAlign="center";
+      ctx.fillText("◀",50,H-41);ctx.fillText("▶",124,H-41);ctx.fillText("JUMP",W-54,H-43);
+      ctx.globalAlpha=1;ctx.textAlign="left";
+    }
+  }
+
+  function drawButton(text,y,selected) {
+    ctx.fillStyle=selected?"#f4d06f":"rgba(19,32,51,.88)";
+    ctx.strokeStyle=selected?"#fff0b0":"#73849b";ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(W/2-135,y,270,52,10);ctx.fill();ctx.stroke();
+    ctx.fillStyle=selected?"#253047":"#f4f7ff";
+    ctx.font="bold 18px system-ui";ctx.textAlign="center";ctx.fillText(text,W/2,y+33);ctx.textAlign="left";
+  }
+
+  function drawOverlay(title,subtitle) {
+    ctx.fillStyle="rgba(10,16,29,.72)";ctx.fillRect(0,0,W,H);
+    ctx.textAlign="center";ctx.fillStyle="#f4f7ff";
+    ctx.font="900 48px system-ui";ctx.fillText(title,W/2,150);
+    ctx.font="17px system-ui";ctx.fillStyle="#c6d7e9";ctx.fillText(subtitle,W/2,190);
+    ctx.textAlign="left";
+  }
+
+  function draw() {
+    if(!world) {
+      ctx.fillStyle="#83d9ed";ctx.fillRect(0,0,W,H);
+      drawTitleBackground();
+    } else {
+      drawBackground();
+      for(const p of world.platforms)drawPlatform(p);
+      for(const s of world.spikes)drawSpike(s);
+      for(const cp of world.checkpoints)drawCheckpoint(cp);
+      for(const s of world.shards)drawCollectible(s);
+      drawPortal();
+      for(const e of world.enemies)drawEnemy(e);
+      drawPlayer();
+      for(const p of particles){
+        ctx.globalAlpha=Math.max(0,p.life/40);ctx.fillStyle=p.color;ctx.fillRect(p.x-cameraX,p.y,p.size,p.size);
+      }
+      ctx.globalAlpha=1;
+      drawHUD();
+    }
+
+    if(state==="menu"){
+      drawOverlay("PIXELBOUND","A small platform adventure");
+      ctx.textAlign="center";ctx.fillStyle="#c6d7e9";ctx.font="15px system-ui";
+      ctx.fillText("Three worlds. Hidden shards. Watch your footing.",W/2,226);ctx.textAlign="left";
+      drawButton("PLAY",285,menuSelection===0);
+      drawButton("CONTROLS",350,menuSelection===1);
+      ctx.textAlign="center";ctx.fillStyle="#d4e0ee";ctx.font="13px system-ui";
+      ctx.fillText("No ads. No upgrades. Just the platforming.",W/2,448);ctx.textAlign="left";
+    } else if(state==="controls"){
+      drawOverlay("CONTROLS","Keyboard and touch controls");
+      ctx.textAlign="center";ctx.font="18px system-ui";ctx.fillStyle="#f4f7ff";
+      ctx.fillText("Move: A / D or Left / Right arrows",W/2,260);
+      ctx.fillText("Jump: Space, W, or Up arrow",W/2,300);
+      ctx.fillText("Press jump again in the air for a DOUBLE JUMP",W/2,340);
+      ctx.fillText("Land on a platform to restore both jumps",W/2,380);
+      ctx.fillText("Pause: Escape",W/2,420);
+      ctx.font="14px system-ui";ctx.fillStyle="#c6d7e9";ctx.fillText("Click or press Enter to return",W/2,472);ctx.textAlign="left";
+    } else if(state==="paused"){
+      drawOverlay("PAUSED","Take a breather");
+      drawButton("RESUME",280,false);
+      drawButton("MAIN MENU",350,false);
+    } else if(state==="gameover"){
+      drawOverlay("GAME OVER","The facility of floating platforms won this round.");
+      ctx.textAlign="center";ctx.fillStyle="#f4f7ff";ctx.font="18px system-ui";
+      ctx.fillText("Shards collected: "+shards,W/2,245);ctx.textAlign="left";
+      drawButton("MAIN MENU",300,false);
+    } else if(state==="victory"){
+      drawOverlay("YOU MADE IT!","You crossed all three worlds.");
+      ctx.textAlign="center";ctx.fillStyle="#f4f7ff";ctx.font="18px system-ui";
+      ctx.fillText("Final shards: "+shards,W/2,245);ctx.textAlign="left";
+      drawButton("MAIN MENU",300,false);
+    }
+  }
+
+  function drawTitleBackground() {
+    const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#83d9ed");g.addColorStop(1,"#e8f8ff");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#5c9cae";ctx.beginPath();ctx.moveTo(0,390);ctx.lineTo(170,205);ctx.lineTo(320,390);ctx.lineTo(510,235);ctx.lineTo(720,390);ctx.lineTo(860,220);ctx.lineTo(960,350);ctx.lineTo(960,540);ctx.lineTo(0,540);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#65b4a0";ctx.fillRect(0,470,W,70);
+    ctx.fillStyle="#7dba78";ctx.fillRect(0,470,W,7);
+    // Decorative platforms
+    [[150,390,130],[365,330,125],[640,385,120],[810,320,110]].forEach(p=>{
+      ctx.fillStyle="#493f42";ctx.fillRect(p[0],p[1],p[2],18);ctx.fillStyle="#7dba78";ctx.fillRect(p[0],p[1],p[2],6);
+    });
+    // Tiny player silhouette
+    ctx.fillStyle="#e76f51";ctx.fillRect(90,418,24,32);ctx.fillStyle="#f0bd8b";ctx.fillRect(94,403,18,18);ctx.fillStyle="#26344c";ctx.fillRect(92,401,22,7);
+  }
+
+  function loop(now) {
+    const dt=Math.min(34,now-(lastTime||now));lastTime=now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
