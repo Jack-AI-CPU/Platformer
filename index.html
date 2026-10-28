@@ -1,0 +1,705 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixelbound - Platformer</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #101528;
+    color: white;
+    font-family: system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  header { text-align: center; padding: 14px 10px 8px; }
+  h1 { margin: 0; color: #7cf5cf; letter-spacing: 3px; }
+  header p { margin: 5px 0; color: #b8c6e6; }
+  #gameWrap {
+    width: min(960px, 100%);
+    padding: 8px;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    background: #81cfff;
+    border: 3px solid #35466b;
+    border-radius: 10px;
+    image-rendering: pixelated;
+  }
+  #hud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 4px;
+    font-weight: 700;
+  }
+  .stat { color: #7cf5cf; }
+  #message {
+    min-height: 24px;
+    text-align: center;
+    color: #ffe28a;
+    font-weight: 700;
+    padding: 4px;
+  }
+  #controls {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    width: min(960px, 100%);
+    padding: 10px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  .group { display: flex; gap: 8px; }
+  button {
+    color: white;
+    background: #29395e;
+    border: 2px solid #536b9b;
+    border-radius: 12px;
+    min-width: 58px;
+    min-height: 52px;
+    padding: 10px 15px;
+    font-size: 19px;
+    font-weight: 800;
+    cursor: pointer;
+    touch-action: none;
+  }
+  button:active { background: #4768a3; }
+  #restart { font-size: 14px; min-width: auto; }
+  footer {
+    color: #aab7d4;
+    padding: 8px 12px 24px;
+    text-align: center;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>PIXELBOUND</h1>
+  <p>Run. Jump. Survive.</p>
+</header>
+
+<div id="gameWrap">
+  <canvas id="game" width="960" height="540"></canvas>
+  <div id="hud">
+    <span>LEVEL <span class="stat" id="level">1</span></span>
+    <span>LIVES <span class="stat" id="lives">3</span></span>
+    <span>COINS <span class="stat" id="coins">0</span></span>
+    <span>CHECKPOINT <span class="stat" id="checkpoint">START</span></span>
+    <button id="restart">RESTART</button>
+  </div>
+  <div id="message">Reach the glowing portal!</div>
+</div>
+
+<div id="controls">
+  <div class="group">
+    <button data-key="left" aria-label="Move left">◀</button>
+    <button data-key="right" aria-label="Move right">▶</button>
+  </div>
+  <div class="group">
+    <button data-key="jump" aria-label="Jump">JUMP ▲</button>
+  </div>
+</div>
+
+<footer>
+  Keyboard: A/D or ←/→ to move · W, ↑ or SPACE to jump · R to restart
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  const ui = {
+    level: document.getElementById("level"),
+    lives: document.getElementById("lives"),
+    coins: document.getElementById("coins"),
+    checkpoint: document.getElementById("checkpoint"),
+    message: document.getElementById("message")
+  };
+
+  // Each level is built from platforms, spikes, coins and enemies.
+  const levels = [
+    {
+      name: "Green Hills", width: 2500,
+      spawn: [60, 400],
+      platforms: [
+        [0,470,420,70], [480,470,300,70],
+        [850,420,230,120], [1150,470,360,70],
+        [1580,410,220,130], [1880,470,620,70],
+        [180,370,130,18], [550,360,130,18],
+        [920,300,120,18], [1230,360,130,18],
+        [1640,300,100,18], [1980,380,130,18]
+      ],
+      spikes: [
+        [270,450,50,20], [600,450,60,20],
+        [1300,450,60,20], [2040,450,60,20]
+      ],
+      coins: [
+        [220,330], [600,320], [960,260], [1290,320],
+        [1680,260], [2040,340], [2280,420]
+      ],
+      enemies: [
+        [530,430,710], [1230,430,1450], [1950,430,2250]
+      ],
+      checkpoint: [1590,365],
+      goal: [2390,390]
+    },
+    {
+      name: "The Deep Cavern", width: 2800,
+      spawn: [50, 400],
+      platforms: [
+        [0,470,300,70], [370,420,220,120],
+        [660,360,180,180], [910,420,220,120],
+        [1200,470,260,70], [1530,390,220,150],
+        [1820,330,180,210], [2070,410,230,130],
+        [2390,470,410,70],
+        [100,350,100,18], [430,310,100,18],
+        [970,320,100,18], [1260,360,100,18],
+        [1580,280,100,18], [2110,320,100,18],
+        [2440,370,120,18]
+      ],
+      spikes: [
+        [190,450,55,20], [430,400,65,20],
+        [1000,400,60,20], [1290,450,70,20],
+        [1880,310,60,20], [2160,390,60,20]
+      ],
+      coins: [
+        [150,310], [480,270], [740,320], [1010,280],
+        [1300,320], [1620,240], [1890,290],
+        [2160,280], [2500,330], [2650,430]
+      ],
+      enemies: [
+        [400,380,550], [950,380,1100],
+        [1550,350,1710], [2110,370,2250], [2440,430,2670]
+      ],
+      checkpoint: [1840,275],
+      goal: [2710,390]
+    },
+    {
+      name: "Sky Ruins", width: 3000,
+      spawn: [50, 400],
+      platforms: [
+        [0,470,230,70], [310,420,150,18],
+        [530,350,150,18], [750,410,150,18],
+        [970,330,170,18], [1210,400,150,18],
+        [1440,310,160,18], [1670,390,170,18],
+        [1920,320,150,18], [2150,400,170,18],
+        [2400,330,160,18], [2630,420,370,120]
+      ],
+      spikes: [
+        [110,450,55,20], [340,400,45,20],
+        [780,390,50,20], [1250,380,45,20],
+        [1710,370,55,20], [2200,380,50,20],
+        [2660,400,50,20]
+      ],
+      coins: [
+        [370,370], [580,300], [800,360], [1030,280],
+        [1260,350], [1480,260], [1730,340],
+        [1960,270], [2220,350], [2450,280], [2800,380]
+      ],
+      enemies: [
+        [330,390,420], [770,380,860],
+        [1460,280,1570], [1930,290,2040],
+        [2670,390,2880]
+      ],
+      checkpoint: [2410,285],
+      goal: [2890,340]
+    }
+  ];
+
+  const keys = { left: false, right: false, jump: false };
+  let levelIndex = 0;
+  let levelData;
+  let platforms, spikes, coins, enemies;
+  let cameraX = 0;
+  let lives = 3;
+  let totalCoins = 0;
+  let checkpointX = 60, checkpointY = 400;
+  let checkpointReached = false;
+  let gameState = "playing";
+  let previousJump = false;
+  let jumpBuffer = 0;
+  let coyoteTime = 0;
+  let lastTime = 0;
+  let elapsed = 0;
+
+  const player = {
+    x: 60, y: 400, w: 28, h: 38,
+    vx: 0, vy: 0,
+    speed: 300, jump: 650,
+    grounded: false, invulnerable: 0
+  };
+
+  function loadLevel(index) {
+    levelIndex = index;
+    levelData = levels[index];
+    platforms = levelData.platforms.map(p => [...p]);
+    spikes = levelData.spikes.map(s => [...s]);
+    coins = levelData.coins.map(c => ({
+      x: c[0], y: c[1], collected: false, phase: Math.random() * 6
+    }));
+    enemies = levelData.enemies.map(e => ({
+      x: e[0], startX: e[0], y: e[1] - 32,
+      w: 32, h: 32, minX: e[0], maxX: e[1 + 1],
+      dir: 1, speed: 85, alive: true
+    }));
+
+    // Enemy definitions are [startX, patrolMin, patrolMax].
+    enemies = levelData.enemies.map(e => ({
+      x: e[0], y: e[1] - 32, w: 32, h: 32,
+      minX: e[0], maxX: e[2], dir: 1,
+      speed: 75 + Math.random() * 25, alive: true
+    }));
+
+    checkpointX = levelData.spawn[0];
+    checkpointY = levelData.spawn[1];
+    checkpointReached = false;
+
+    player.x = checkpointX;
+    player.y = checkpointY;
+    player.vx = player.vy = 0;
+    player.invulnerable = 1.2;
+    cameraX = 0;
+    gameState = "playing";
+    ui.message.textContent = levelData.name + " — reach the portal!";
+    updateHUD();
+  }
+
+  function updateHUD() {
+    ui.level.textContent = `${levelIndex + 1}/${levels.length}`;
+    ui.lives.textContent = lives;
+    ui.coins.textContent = totalCoins;
+    ui.checkpoint.textContent = checkpointReached ? "SAVED" : "START";
+  }
+
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+  }
+
+  function resetAtCheckpoint() {
+    player.x = checkpointX;
+    player.y = checkpointY;
+    player.vx = player.vy = 0;
+    player.invulnerable = 1.5;
+    player.grounded = false;
+    jumpBuffer = 0;
+    coyoteTime = 0;
+  }
+
+  function die() {
+    if (player.invulnerable > 0 || gameState !== "playing") return;
+    lives--;
+    updateHUD();
+
+    if (lives <= 0) {
+      gameState = "gameover";
+      ui.message.textContent = "Game over! Press R or RESTART to try again.";
+    } else {
+      ui.message.textContent = "Ouch! Watch out for hazards.";
+      resetAtCheckpoint();
+    }
+  }
+
+  function nextLevel() {
+    if (levelIndex < levels.length - 1) {
+      loadLevel(levelIndex + 1);
+    } else {
+      gameState = "won";
+      ui.message.textContent = "You conquered Pixelbound! Press R to play again.";
+    }
+  }
+
+  function update(dt) {
+    elapsed += dt;
+
+    if (gameState !== "playing") return;
+
+    player.invulnerable = Math.max(0, player.invulnerable - dt);
+
+    if (keys.jump && !previousJump) jumpBuffer = 0.13;
+    previousJump = keys.jump;
+    jumpBuffer = Math.max(0, jumpBuffer - dt);
+
+    player.vx = (Number(keys.right) - Number(keys.left)) * player.speed;
+
+    if (player.grounded) coyoteTime = 0.12;
+    else coyoteTime = Math.max(0, coyoteTime - dt);
+
+    if (jumpBuffer > 0 && coyoteTime > 0) {
+      player.vy = -player.jump;
+      player.grounded = false;
+      coyoteTime = 0;
+      jumpBuffer = 0;
+    }
+
+    player.vy += 1800 * dt;
+    player.vy = Math.min(player.vy, 1000);
+
+    // Horizontal collision.
+    player.x += player.vx * dt;
+    for (const p of platforms) {
+      if (rectsOverlap(player, {x:p[0],y:p[1],w:p[2],h:p[3]})) {
+        if (player.vx > 0) player.x = p[0] - player.w;
+        else if (player.vx < 0) player.x = p[0] + p[2];
+      }
+    }
+
+    // Vertical collision.
+    const oldY = player.y;
+    player.y += player.vy * dt;
+    player.grounded = false;
+
+    for (const p of platforms) {
+      const platform = {x:p[0],y:p[1],w:p[2],h:p[3]};
+      if (!rectsOverlap(player, platform)) continue;
+
+      if (player.vy > 0 && oldY + player.h <= p[1] + 8) {
+        player.y = p[1] - player.h;
+        player.vy = 0;
+        player.grounded = true;
+      } else if (player.vy < 0 && oldY >= p[1] + p[3] - 4) {
+        player.y = p[1] + p[3];
+        player.vy = 0;
+      }
+    }
+
+    // Enemies patrol and can be defeated by landing on top.
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      e.x += e.dir * e.speed * dt;
+
+      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
+      if (e.x + e.w > e.maxX) { e.x = e.maxX - e.w; e.dir = -1; }
+
+      if (rectsOverlap(player, e)) {
+        if (player.vy > 0 && oldY + player.h <= e.y + 13) {
+          e.alive = false;
+          player.y = e.y - player.h;
+          player.vy = -360;
+          totalCoins += 1;
+          updateHUD();
+        } else {
+          die();
+        }
+      }
+    }
+
+    // Spikes.
+    for (const s of spikes) {
+      if (rectsOverlap(player, {x:s[0],y:s[1],w:s[2],h:s[3]})) die();
+    }
+
+    // Coins.
+    for (const c of coins) {
+      if (c.collected) continue;
+      const coinBox = {x:c.x-10,y:c.y-10,w:20,h:20};
+      if (rectsOverlap(player, coinBox)) {
+        c.collected = true;
+        totalCoins++;
+        updateHUD();
+      }
+    }
+
+    // Checkpoint.
+    const cp = levelData.checkpoint;
+    if (!checkpointReached &&
+        rectsOverlap(player, {x:cp[0],y:cp[1],w:24,h:70})) {
+      checkpointReached = true;
+      checkpointX = cp[0];
+      checkpointY = cp[1] - player.h;
+      ui.message.textContent = "Checkpoint saved!";
+      updateHUD();
+    }
+
+    // Portal.
+    const g = levelData.goal;
+    if (rectsOverlap(player, {x:g[0],y:g[1],w:40,h:80})) {
+      nextLevel();
+      return;
+    }
+
+    if (player.y > H + 250) die();
+
+    // Camera follows the player but stays within the level.
+    cameraX = Math.max(0, Math.min(
+      levelData.width - W,
+      player.x - W * 0.38
+    ));
+  }
+
+  function drawBackground() {
+    const gradient = ctx.createLinearGradient(0,0,0,H);
+    gradient.addColorStop(0, "#65b9f4");
+    gradient.addColorStop(1, "#d6f6ff");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0,0,W,H);
+
+    // Parallax mountains.
+    for (let i=0; i<9; i++) {
+      const x = i * 180 - (cameraX * 0.2 % 180);
+      ctx.fillStyle = i % 2 ? "#8baad0" : "#9bbbdc";
+      ctx.beginPath();
+      ctx.moveTo(x,400);
+      ctx.lineTo(x+90,210+(i%3)*35);
+      ctx.lineTo(x+200,400);
+      ctx.fill();
+    }
+
+    // Clouds.
+    ctx.fillStyle = "rgba(255,255,255,.7)";
+    for (let i=0; i<8; i++) {
+      const x = (i*190 - cameraX*0.12) % (W+160);
+      const cx = (x + W + 160) % (W+160) - 60;
+      const y = 60 + (i%3)*48;
+      ctx.beginPath();
+      ctx.arc(cx,y,22,0,Math.PI*2);
+      ctx.arc(cx+24,y-9,28,0,Math.PI*2);
+      ctx.arc(cx+52,y,20,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawPlatform(p) {
+    const x=p[0]-cameraX, y=p[1], w=p[2], h=p[3];
+    ctx.fillStyle = "#674b39";
+    ctx.fillRect(x,y,w,h);
+    ctx.fillStyle = "#52b95d";
+    ctx.fillRect(x,y,w,8);
+    ctx.fillStyle = "#82e477";
+    ctx.fillRect(x,y,w,3);
+
+    ctx.fillStyle = "rgba(30,30,40,.12)";
+    for (let bx=x+10; bx<x+w; bx+=30) {
+      ctx.fillRect(bx,y+22,12,5);
+    }
+  }
+
+  function drawSpike(s) {
+    const x=s[0]-cameraX, y=s[1], w=s[2], h=s[3];
+    ctx.fillStyle = "#e9f0f5";
+    ctx.fillRect(x,y+h-4,w,4);
+    const count = Math.max(1,Math.floor(w/18));
+    ctx.fillStyle = "#d94c64";
+    for (let i=0; i<count; i++) {
+      const sx=x+i*w/count, sw=w/count;
+      ctx.beginPath();
+      ctx.moveTo(sx,y+h);
+      ctx.lineTo(sx+sw/2,y);
+      ctx.lineTo(sx+sw,y+h);
+      ctx.fill();
+    }
+    ctx.strokeStyle="#a52c48";
+    ctx.lineWidth=2;
+    ctx.strokeRect(x,y+h-4,w,4);
+  }
+
+  function drawCoin(c) {
+    if (c.collected) return;
+    const x=c.x-cameraX;
+    const y=c.y+Math.sin(elapsed*4+c.phase)*4;
+    ctx.fillStyle="#ffb52e";
+    ctx.beginPath();
+    ctx.ellipse(x,y,9,12,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle="#fff2a3";
+    ctx.lineWidth=3;
+    ctx.stroke();
+    ctx.fillStyle="#fff4b4";
+    ctx.fillRect(x-2,y-7,3,8);
+  }
+
+  function drawEnemy(e) {
+    if (!e.alive) return;
+    const x=e.x-cameraX, y=e.y;
+    ctx.fillStyle="#6d2b87";
+    ctx.fillRect(x,y+8,e.w,e.h-8);
+    ctx.fillStyle="#9d4cc1";
+    ctx.fillRect(x+4,y+3,e.w-8,20);
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(x+5,y+10,7,8);
+    ctx.fillRect(x+20,y+10,7,8);
+    ctx.fillStyle="#222038";
+    ctx.fillRect(x+8,y+12,3,5);
+    ctx.fillRect(x+22,y+12,3,5);
+    ctx.fillStyle="#f1a3ff";
+    ctx.fillRect(x+5,y+e.h-3,8,5);
+    ctx.fillRect(x+21,y+e.h-3,8,5);
+  }
+
+  function drawCheckpoint() {
+    const cp=levelData.checkpoint;
+    const x=cp[0]-cameraX, y=cp[1];
+    ctx.fillStyle="#39465f";
+    ctx.fillRect(x,y,5,70);
+    ctx.fillStyle=checkpointReached?"#7cf5cf":"#ffe28a";
+    ctx.beginPath();
+    ctx.moveTo(x+5,y);
+    ctx.lineTo(x+34,y+12);
+    ctx.lineTo(x+5,y+24);
+    ctx.fill();
+    if (checkpointReached) {
+      ctx.fillStyle="rgba(124,245,207,.3)";
+      ctx.beginPath();
+      ctx.arc(x+12,y+22,30,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawGoal() {
+    const g=levelData.goal;
+    const x=g[0]-cameraX, y=g[1];
+    const pulse=1+Math.sin(elapsed*4)*.07;
+
+    ctx.fillStyle="rgba(115,75,255,.25)";
+    ctx.beginPath();
+    ctx.ellipse(x+20,y+38,32*pulse,46*pulse,0,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle="#7655ff";
+    ctx.lineWidth=7;
+    ctx.beginPath();
+    ctx.ellipse(x+20,y+40,19,35,0,0,Math.PI*2);
+    ctx.stroke();
+
+    ctx.strokeStyle="#c8a5ff";
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.ellipse(x+20,y+40,12,29,0,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  function drawPlayer() {
+    if (player.invulnerable > 0 &&
+        Math.floor(elapsed*12)%2===0) return;
+
+    const x=player.x-cameraX, y=player.y;
+    ctx.fillStyle="#27334f";
+    ctx.fillRect(x+4,y+8,player.w-8,player.h-8);
+    ctx.fillStyle="#7cf5cf";
+    ctx.fillRect(x+2,y+6,player.w-4,player.h-12);
+    ctx.fillStyle="#eaffff";
+    ctx.fillRect(x+5,y+9,player.w-10,12);
+    ctx.fillStyle="#263751";
+    ctx.fillRect(x+9,y+12,4,5);
+    ctx.fillRect(x+18,y+12,4,5);
+
+    ctx.fillStyle="#35466b";
+    const step=player.grounded && Math.abs(player.vx)>0
+      ? Math.sin(elapsed*18)*3 : 0;
+    ctx.fillRect(x+4,y+player.h-4,8,7+step);
+    ctx.fillRect(x+17,y+player.h-4,8,7-step);
+  }
+
+  function drawOverlay(title, subtitle) {
+    ctx.fillStyle="rgba(13,19,39,.78)";
+    ctx.fillRect(0,0,W,H);
+    ctx.textAlign="center";
+    ctx.fillStyle="#7cf5cf";
+    ctx.font="bold 48px system-ui";
+    ctx.fillText(title,W/2,H/2-25);
+    ctx.fillStyle="#ffffff";
+    ctx.font="20px system-ui";
+    ctx.fillText(subtitle,W/2,H/2+22);
+    ctx.textAlign="left";
+  }
+
+  function render() {
+    drawBackground();
+
+    ctx.save();
+    for (const p of platforms) drawPlatform(p);
+    for (const s of spikes) drawSpike(s);
+    for (const c of coins) drawCoin(c);
+    for (const e of enemies) drawEnemy(e);
+    drawCheckpoint();
+    drawGoal();
+    drawPlayer();
+    ctx.restore();
+
+    if (gameState==="gameover") {
+      drawOverlay("GAME OVER","Press R or RESTART to try again");
+    } else if (gameState==="won") {
+      drawOverlay("YOU WIN!","All levels complete! Press R to play again");
+    }
+  }
+
+  function frame(time) {
+    const dt=Math.min((time-lastTime)/1000 || 0,0.033);
+    lastTime=time;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function restartGame() {
+    lives=3;
+    totalCoins=0;
+    elapsed=0;
+    previousJump=false;
+    jumpBuffer=0;
+    loadLevel(0);
+  }
+
+  // Keyboard controls.
+  window.addEventListener("keydown", e => {
+    const k=e.key.toLowerCase();
+
+    if (["arrowleft","arrowright","arrowup"," "].includes(k))
+      e.preventDefault();
+
+    if (k==="a" || k==="arrowleft") keys.left=true;
+    if (k==="d" || k==="arrowright") keys.right=true;
+    if (k==="w" || k==="arrowup" || k===" ") keys.jump=true;
+    if (k==="r") restartGame();
+  });
+
+  window.addEventListener("keyup", e => {
+    const k=e.key.toLowerCase();
+    if (k==="a" || k==="arrowleft") keys.left=false;
+    if (k==="d" || k==="arrowright") keys.right=false;
+    if (k==="w" || k==="arrowup" || k===" ") keys.jump=false;
+  });
+
+  // Touch controls. Holding a button holds the corresponding action.
+  document.querySelectorAll("[data-key]").forEach(button => {
+    const key=button.dataset.key;
+    const release=() => { keys[key]=false; };
+
+    button.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      keys[key]=true;
+      button.setPointerCapture(e.pointerId);
+    });
+    button.addEventListener("pointerup", release);
+    button.addEventListener("pointercancel", release);
+    button.addEventListener("lostpointercapture", release);
+  });
+
+  window.addEventListener("blur", () => {
+    keys.left=keys.right=keys.jump=false;
+  });
+
+  document.getElementById("restart").addEventListener("click",restartGame);
+
+  loadLevel(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
