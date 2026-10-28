@@ -3,702 +3,509 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pixelbound - Platformer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixelbound</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: #101528;
-    color: white;
-    font-family: system-ui, sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-  }
-  header { text-align: center; padding: 14px 10px 8px; }
-  h1 { margin: 0; color: #7cf5cf; letter-spacing: 3px; }
-  header p { margin: 5px 0; color: #b8c6e6; }
-  #gameWrap {
-    width: min(960px, 100%);
-    padding: 8px;
-  }
-  canvas {
-    display: block;
-    width: 100%;
-    background: #81cfff;
-    border: 3px solid #35466b;
-    border-radius: 10px;
-    image-rendering: pixelated;
-  }
-  #hud {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 4px;
-    font-weight: 700;
-  }
-  .stat { color: #7cf5cf; }
-  #message {
-    min-height: 24px;
-    text-align: center;
-    color: #ffe28a;
-    font-weight: 700;
-    padding: 4px;
-  }
-  #controls {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    width: min(960px, 100%);
-    padding: 10px;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-  }
-  .group { display: flex; gap: 8px; }
-  button {
-    color: white;
-    background: #29395e;
-    border: 2px solid #536b9b;
-    border-radius: 12px;
-    min-width: 58px;
-    min-height: 52px;
-    padding: 10px 15px;
-    font-size: 19px;
-    font-weight: 800;
-    cursor: pointer;
-    touch-action: none;
-  }
-  button:active { background: #4768a3; }
-  #restart { font-size: 14px; min-width: auto; }
-  footer {
-    color: #aab7d4;
-    padding: 8px 12px 24px;
-    text-align: center;
-    font-size: 13px;
-  }
+*{box-sizing:border-box}
+body{margin:0;background:#101521;color:#edf4ff;font-family:system-ui,sans-serif}
+header{text-align:center;padding:15px 8px 8px}
+h1{font-size:clamp(25px,5vw,38px);letter-spacing:7px;margin:0;color:#d9fbe9}
+header p{color:#9eafc7;margin:5px}
+main{width:min(100%,1000px);margin:auto;padding:8px}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#17243a;border:1px solid #53647a;border-radius:3px}
+#hud{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 4px;color:#aebed4;font-size:13px;letter-spacing:1px}
+#hud b{color:#eff8ff}
+#status{color:#c8d8ec;text-align:center;min-height:25px;font-size:13px}
+#touch{display:none;justify-content:space-between;gap:12px;padding:10px 0}
+.touchgroup{display:flex;gap:8px}
+button{font:inherit;color:#e9f4ff;background:#1e2b41;border:1px solid #53647a;padding:12px 18px;cursor:pointer}
+button:hover{background:#30445f}
+button:focus-visible{outline:2px solid #a8f5d1;outline-offset:3px}
+#touch button{min-width:58px;min-height:52px;touch-action:none;user-select:none}
+.note{text-align:center;color:#8798b2;font-size:12px;padding:8px 0 20px}
+@media(max-width:650px){#touch{display:flex}#hud{font-size:11px}}
 </style>
 </head>
 <body>
 <header>
-  <h1>PIXELBOUND</h1>
-  <p>Run. Jump. Survive.</p>
+<h1>PIXELBOUND</h1>
+<p>A journey through forgotten worlds</p>
 </header>
-
-<div id="gameWrap">
-  <canvas id="game" width="960" height="540"></canvas>
-  <div id="hud">
-    <span>LEVEL <span class="stat" id="level">1</span></span>
-    <span>LIVES <span class="stat" id="lives">3</span></span>
-    <span>COINS <span class="stat" id="coins">0</span></span>
-    <span>CHECKPOINT <span class="stat" id="checkpoint">START</span></span>
-    <button id="restart">RESTART</button>
-  </div>
-  <div id="message">Reach the glowing portal!</div>
+<main>
+<canvas id="game" width="960" height="540"></canvas>
+<div id="hud">
+<span>WORLD <b id="world">—</b></span>
+<span>LIVES <b id="lives">3</b></span>
+<span>SHARDS <b id="shards">0</b></span>
+<span>CHECKPOINT <b id="saved">NONE</b></span>
 </div>
-
-<div id="controls">
-  <div class="group">
-    <button data-key="left" aria-label="Move left">◀</button>
-    <button data-key="right" aria-label="Move right">▶</button>
-  </div>
-  <div class="group">
-    <button data-key="jump" aria-label="Jump">JUMP ▲</button>
-  </div>
+<div id="status">Explore. Survive. Find your way forward.</div>
+<div id="touch">
+ <div class="touchgroup">
+  <button data-key="left">◀</button><button data-key="right">▶</button>
+ </div>
+ <div class="touchgroup"><button data-key="jump">JUMP</button></div>
 </div>
-
-<footer>
-  Keyboard: A/D or ←/→ to move · W, ↑ or SPACE to jump · R to restart
-</footer>
-
+<div class="note">A / D or arrow keys to move · W / ↑ / Space to jump · R to restart</div>
+</main>
 <script>
 (() => {
-  "use strict";
+"use strict";
+const canvas=document.querySelector("#game"),ctx=canvas.getContext("2d");
+const W=960,H=540;
+const $=id=>document.getElementById(id);
+const keys={left:false,right:false,jump:false};
+let state="menu",world=0,camera=0,time=0,last=0,shards=0,lives=3;
+let jumpWasDown=false,jumpBuffer=0,coyote=0,particles=[];
+let messageTimer=0,menuSelection=0;
 
-  const canvas = document.getElementById("game");
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
+const worlds=[
+{
+name:"GREEN HILLS",sky:"#7ab9df",far:"#7997aa",near:"#426e68",
+width:2500,spawn:[60,410],
+p:[[0,470,420,70],[480,470,300,70],[850,420,230,120],[1150,470,360,70],[1580,410,220,130],[1880,470,620,70],[180,370,130,18],[550,360,130,18],[920,300,120,18],[1230,360,130,18],[1640,300,100,18],[1980,380,130,18]],
+s:[[270,450,50,20],[600,450,60,20],[1300,450,60,20],[2040,450,60,20]],
+c:[[220,330],[600,320],[960,260],[1290,320],[1680,260],[2040,340],[2280,420]],
+e:[
+ {type:"walker",x:530,min:510,max:710,y:438},
+ {type:"hopper",x:1230,min:1210,max:1450,y:438},
+ {type:"walker",x:1950,min:1910,max:2250,y:438},
+ {type:"flyer",x:1010,min:950,max:1070,y:230}
+],
+cp:[1590,365],goal:[2390,390]
+},
+{
+name:"THE DEEP CAVERN",sky:"#435b7b",far:"#354560",near:"#222e47",
+width:2800,spawn:[50,410],
+p:[[0,470,300,70],[370,420,220,120],[660,360,180,180],[910,420,220,120],[1200,470,260,70],[1530,390,220,150],[1820,330,180,210],[2070,410,230,130],[2390,470,410,70],[100,350,100,18],[430,310,100,18],[970,320,100,18],[1260,360,100,18],[1580,280,100,18],[2110,320,100,18],[2440,370,120,18]],
+s:[[190,450,55,20],[430,400,65,20],[1000,400,60,20],[1290,450,70,20],[1880,310,60,20],[2160,390,60,20]],
+c:[[150,310],[480,270],[740,320],[1010,280],[1300,320],[1620,240],[1890,290],[2160,280],[2500,330],[2650,430]],
+e:[
+ {type:"hopper",x:400,min:380,max:550,y:388},
+ {type:"walker",x:950,min:930,max:1100,y:388},
+ {type:"flyer",x:1550,min:1510,max:1740,y:225},
+ {type:"hopper",x:2110,min:2100,max:2260,y:378},
+ {type:"walker",x:2440,min:2410,max:2670,y:438},
+ {type:"flyer",x:780,min:690,max:840,y:230}
+],
+cp:[1840,275],goal:[2710,390]
+},
+{
+name:"SKY RUINS",sky:"#b4a7d7",far:"#8b86ac",near:"#555e83",
+width:3000,spawn:[50,410],
+p:[[0,470,230,70],[310,420,150,18],[530,350,150,18],[750,410,150,18],[970,330,170,18],[1210,400,150,18],[1440,310,160,18],[1670,390,170,18],[1920,320,150,18],[2150,400,170,18],[2400,330,160,18],[2630,420,370,120]],
+s:[[110,450,55,20],[340,400,45,20],[780,390,50,20],[1250,380,45,20],[1710,370,55,20],[2200,380,50,20],[2660,400,50,20]],
+c:[[370,370],[580,300],[800,360],[1030,280],[1260,350],[1480,260],[1730,340],[1960,270],[2220,350],[2450,280],[2800,380]],
+e:[
+ {type:"hopper",x:330,min:320,max:430,y:388},
+ {type:"flyer",x:770,min:750,max:900,y:290},
+ {type:"walker",x:1460,min:1450,max:1580,y:278},
+ {type:"flyer",x:1930,min:1920,max:2070,y:230},
+ {type:"hopper",x:2670,min:2650,max:2880,y:388}
+],
+cp:[2410,285],goal:[2890,340]
+}
+];
 
-  const ui = {
-    level: document.getElementById("level"),
-    lives: document.getElementById("lives"),
-    coins: document.getElementById("coins"),
-    checkpoint: document.getElementById("checkpoint"),
-    message: document.getElementById("message")
-  };
+const player={x:60,y:410,w:27,h:38,vx:0,vy:0,ground:false,face:1,invuln:0,run:0};
 
-  // Each level is built from platforms, spikes, coins and enemies.
-  const levels = [
-    {
-      name: "Green Hills", width: 2500,
-      spawn: [60, 400],
-      platforms: [
-        [0,470,420,70], [480,470,300,70],
-        [850,420,230,120], [1150,470,360,70],
-        [1580,410,220,130], [1880,470,620,70],
-        [180,370,130,18], [550,360,130,18],
-        [920,300,120,18], [1230,360,130,18],
-        [1640,300,100,18], [1980,380,130,18]
-      ],
-      spikes: [
-        [270,450,50,20], [600,450,60,20],
-        [1300,450,60,20], [2040,450,60,20]
-      ],
-      coins: [
-        [220,330], [600,320], [960,260], [1290,320],
-        [1680,260], [2040,340], [2280,420]
-      ],
-      enemies: [
-        [530,430,710], [1230,430,1450], [1950,430,2250]
-      ],
-      checkpoint: [1590,365],
-      goal: [2390,390]
-    },
-    {
-      name: "The Deep Cavern", width: 2800,
-      spawn: [50, 400],
-      platforms: [
-        [0,470,300,70], [370,420,220,120],
-        [660,360,180,180], [910,420,220,120],
-        [1200,470,260,70], [1530,390,220,150],
-        [1820,330,180,210], [2070,410,230,130],
-        [2390,470,410,70],
-        [100,350,100,18], [430,310,100,18],
-        [970,320,100,18], [1260,360,100,18],
-        [1580,280,100,18], [2110,320,100,18],
-        [2440,370,120,18]
-      ],
-      spikes: [
-        [190,450,55,20], [430,400,65,20],
-        [1000,400,60,20], [1290,450,70,20],
-        [1880,310,60,20], [2160,390,60,20]
-      ],
-      coins: [
-        [150,310], [480,270], [740,320], [1010,280],
-        [1300,320], [1620,240], [1890,290],
-        [2160,280], [2500,330], [2650,430]
-      ],
-      enemies: [
-        [400,380,550], [950,380,1100],
-        [1550,350,1710], [2110,370,2250], [2440,430,2670]
-      ],
-      checkpoint: [1840,275],
-      goal: [2710,390]
-    },
-    {
-      name: "Sky Ruins", width: 3000,
-      spawn: [50, 400],
-      platforms: [
-        [0,470,230,70], [310,420,150,18],
-        [530,350,150,18], [750,410,150,18],
-        [970,330,170,18], [1210,400,150,18],
-        [1440,310,160,18], [1670,390,170,18],
-        [1920,320,150,18], [2150,400,170,18],
-        [2400,330,160,18], [2630,420,370,120]
-      ],
-      spikes: [
-        [110,450,55,20], [340,400,45,20],
-        [780,390,50,20], [1250,380,45,20],
-        [1710,370,55,20], [2200,380,50,20],
-        [2660,400,50,20]
-      ],
-      coins: [
-        [370,370], [580,300], [800,360], [1030,280],
-        [1260,350], [1480,260], [1730,340],
-        [1960,270], [2220,350], [2450,280], [2800,380]
-      ],
-      enemies: [
-        [330,390,420], [770,380,860],
-        [1460,280,1570], [1930,290,2040],
-        [2670,390,2880]
-      ],
-      checkpoint: [2410,285],
-      goal: [2890,340]
-    }
-  ];
+let level;
+let platforms=[],spikes=[],coins=[],enemies=[],checkpoint={x:60,y:410},goal=[0,0],checkpointSaved=false;
 
-  const keys = { left: false, right: false, jump: false };
-  let levelIndex = 0;
-  let levelData;
-  let platforms, spikes, coins, enemies;
-  let cameraX = 0;
-  let lives = 3;
-  let totalCoins = 0;
-  let checkpointX = 60, checkpointY = 400;
-  let checkpointReached = false;
-  let gameState = "playing";
-  let previousJump = false;
-  let jumpBuffer = 0;
-  let coyoteTime = 0;
-  let lastTime = 0;
-  let elapsed = 0;
+function makeLevel(i){
+ world=i;level=worlds[i];
+ platforms=level.p.map(a=>a.slice());
+ spikes=level.s.map(a=>a.slice());
+ coins=level.c.map(a=>({x:a[0],y:a[1],got:false,phase:Math.random()*7}));
+ enemies=level.e.map(e=>({...e,homeY:e.y,dir:1,alive:true,phase:Math.random()*7,v:70+Math.random()*25,vy:0}));
+ checkpoint={x:level.spawn[0],y:level.spawn[1]};
+ checkpointSaved=false;
+ player.x=checkpoint.x;player.y=checkpoint.y;
+ player.vx=player.vy=0;player.ground=false;player.invuln=1;
+ camera=0;particles=[];
+ updateHUD();
+}
 
-  const player = {
-    x: 60, y: 400, w: 28, h: 38,
-    vx: 0, vy: 0,
-    speed: 300, jump: 650,
-    grounded: false, invulnerable: 0
-  };
+function updateHUD(){
+ $("world").textContent=(world+1)+" / "+worlds.length+" — "+level.name;
+ $("lives").textContent=lives;
+ $("shards").textContent=shards;
+ $("saved").textContent=checkpointSaved?"SAVED":"NONE";
+}
+function say(text,seconds=2){
+ $("status").textContent=text;messageTimer=seconds;
+}
+function overlap(a,b){
+ return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+}
+function burst(x,y,color,n=12){
+ for(let i=0;i<n;i++){
+  const a=Math.random()*Math.PI*2,v=40+Math.random()*180;
+  particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.3+Math.random()*.5,max:.8,color,size:2+Math.random()*3});
+ }
+}
+function respawn(){
+ player.x=checkpoint.x;player.y=checkpoint.y;
+ player.vx=player.vy=0;player.invuln=1.7;
+ player.ground=false;coyote=0;jumpBuffer=0;
+}
+function die(){
+ if(player.invuln>0||state!=="playing")return;
+ lives--;burst(player.x+player.w/2,player.y+player.h/2,"#ff7788",20);
+ updateHUD();
+ if(lives<=0){state="dead";say("The journey ends here.",100);return;}
+ say("You fell. Keep going.");
+ respawn();
+}
+function startGame(){
+ lives=3;shards=0;time=0;jumpWasDown=false;
+ makeLevel(0);state="playing";say("Find the portal.");
+}
+function nextLevel(){
+ if(world<worlds.length-1){
+  makeLevel(world+1);say("Entering "+level.name,3);
+ }else{state="victory";burst(player.x,player.y,"#d8f7b2",60);say("Journey complete.",100);}
+}
 
-  function loadLevel(index) {
-    levelIndex = index;
-    levelData = levels[index];
-    platforms = levelData.platforms.map(p => [...p]);
-    spikes = levelData.spikes.map(s => [...s]);
-    coins = levelData.coins.map(c => ({
-      x: c[0], y: c[1], collected: false, phase: Math.random() * 6
-    }));
-    enemies = levelData.enemies.map(e => ({
-      x: e[0], startX: e[0], y: e[1] - 32,
-      w: 32, h: 32, minX: e[0], maxX: e[1 + 1],
-      dir: 1, speed: 85, alive: true
-    }));
+function update(dt){
+ time+=dt;
+ if(messageTimer>0){messageTimer-=dt;if(messageTimer<=0&&state==="playing")say("Find the portal.",100);}
+ for(let i=particles.length-1;i>=0;i--){
+  let p=particles[i];p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=300*dt;
+  if(p.life<=0)particles.splice(i,1);
+ }
+ if(state!=="playing")return;
 
-    // Enemy definitions are [startX, patrolMin, patrolMax].
-    enemies = levelData.enemies.map(e => ({
-      x: e[0], y: e[1] - 32, w: 32, h: 32,
-      minX: e[0], maxX: e[2], dir: 1,
-      speed: 75 + Math.random() * 25, alive: true
-    }));
+ player.invuln=Math.max(0,player.invuln-dt);
+ if(keys.jump&&!jumpWasDown)jumpBuffer=.14;
+ jumpWasDown=keys.jump;
+ jumpBuffer=Math.max(0,jumpBuffer-dt);
 
-    checkpointX = levelData.spawn[0];
-    checkpointY = levelData.spawn[1];
-    checkpointReached = false;
+ player.vx=(Number(keys.right)-Number(keys.left))*290;
+ if(player.vx)player.face=Math.sign(player.vx);
+ if(player.ground)coyote=.12;else coyote=Math.max(0,coyote-dt);
+ if(jumpBuffer>0&&coyote>0){
+  player.vy=-650;player.ground=false;coyote=0;jumpBuffer=0;
+  burst(player.x+player.w/2,player.y+player.h,"#d9fbe9",5);
+ }
+ player.vy=Math.min(950,player.vy+1750*dt);
+ player.run+=Math.abs(player.vx)*dt*.045;
 
-    player.x = checkpointX;
-    player.y = checkpointY;
-    player.vx = player.vy = 0;
-    player.invulnerable = 1.2;
-    cameraX = 0;
-    gameState = "playing";
-    ui.message.textContent = levelData.name + " — reach the portal!";
-    updateHUD();
+ // Horizontal collision.
+ player.x+=player.vx*dt;
+ for(const p of platforms){
+  const r={x:p[0],y:p[1],w:p[2],h:p[3]};
+  if(overlap(player,r)){
+   if(player.vx>0)player.x=p[0]-player.w;
+   if(player.vx<0)player.x=p[0]+p[2];
   }
+ }
+ player.x=Math.max(0,player.x);
 
-  function updateHUD() {
-    ui.level.textContent = `${levelIndex + 1}/${levels.length}`;
-    ui.lives.textContent = lives;
-    ui.coins.textContent = totalCoins;
-    ui.checkpoint.textContent = checkpointReached ? "SAVED" : "START";
+ // Vertical collision.
+ const oldY=player.y;
+ player.y+=player.vy*dt;player.ground=false;
+ for(const p of platforms){
+  const r={x:p[0],y:p[1],w:p[2],h:p[3]};
+  if(!overlap(player,r))continue;
+  if(player.vy>=0&&oldY+player.h<=p[1]+9){
+   player.y=p[1]-player.h;player.vy=0;player.ground=true;
+  }else if(player.vy<0&&oldY>=p[1]+p[3]-4){
+   player.y=p[1]+p[3];player.vy=0;
   }
+ }
 
-  function rectsOverlap(a, b) {
-    return a.x < b.x + b.w &&
-           a.x + a.w > b.x &&
-           a.y < b.y + b.h &&
-           a.y + a.h > b.y;
+ for(const e of enemies){
+  if(!e.alive)continue;
+  if(e.type==="flyer"){
+   e.x+=e.dir*e.v*dt;
+   if(e.x<e.min||e.x+30>e.max)e.dir*=-1;
+   e.y=e.homeY+Math.sin(time*2.5+e.phase)*22;
+  }else{
+   e.x+=e.dir*e.v*dt;
+   if(e.x<e.min){e.x=e.min;e.dir=1;}
+   if(e.x+30>e.max){e.x=e.max-30;e.dir=-1;}
+   if(e.type==="hopper"){
+    e.vy+=1300*dt;e.y+=e.vy*dt;
+    const floor=platforms.filter(p=>e.x+25>p[0]&&e.x+5<p[0]+p[2]&&e.y+30>=p[1]&&e.y+30<=p[1]+24).sort((a,b)=>a[1]-b[1])[0];
+    if(floor&&e.vy>=0){e.y=floor[1]-30;e.vy=0;if(Math.sin(time*2+e.phase)>.94)e.vy=-410;}
+   }
   }
-
-  function resetAtCheckpoint() {
-    player.x = checkpointX;
-    player.y = checkpointY;
-    player.vx = player.vy = 0;
-    player.invulnerable = 1.5;
-    player.grounded = false;
-    jumpBuffer = 0;
-    coyoteTime = 0;
+  const er={x:e.x,y:e.y,w:30,h:30};
+  if(overlap(player,er)){
+   if(player.vy>80&&oldY+player.h<=e.y+13){
+    e.alive=false;player.y=e.y-player.h;player.vy=-370;
+    shards++;burst(e.x+15,e.y+15,"#c3a1ff",15);updateHUD();
+   }else die();
   }
-
-  function die() {
-    if (player.invulnerable > 0 || gameState !== "playing") return;
-    lives--;
-    updateHUD();
-
-    if (lives <= 0) {
-      gameState = "gameover";
-      ui.message.textContent = "Game over! Press R or RESTART to try again.";
-    } else {
-      ui.message.textContent = "Ouch! Watch out for hazards.";
-      resetAtCheckpoint();
-    }
+ }
+ for(const s of spikes){
+  if(overlap(player,{x:s[0],y:s[1],w:s[2],h:s[3]}))die();
+ }
+ for(const c of coins){
+  if(!c.got&&overlap(player,{x:c.x-10,y:c.y-10,w:20,h:20})){
+   c.got=true;shards++;burst(c.x,c.y,"#ffe8a0",9);updateHUD();
   }
+ }
+ const cp=level.cp;
+ if(!checkpointSaved&&overlap(player,{x:cp[0],y:cp[1],w:30,h:80})){
+  checkpointSaved=true;checkpoint={x:cp[0]-8,y:cp[1]-player.h};
+  say("Checkpoint reached. Progress secured.",3);updateHUD();
+  burst(cp[0],cp[1]+10,"#a8f5d1",18);
+ }
+ const g=level.goal;
+ if(overlap(player,{x:g[0],y:g[1],w:40,h:80})){nextLevel();return;}
+ if(player.y>H+230)die();
+ camera=Math.max(0,Math.min(level.width-W,player.x-W*.38));
+}
 
-  function nextLevel() {
-    if (levelIndex < levels.length - 1) {
-      loadLevel(levelIndex + 1);
-    } else {
-      gameState = "won";
-      ui.message.textContent = "You conquered Pixelbound! Press R to play again.";
-    }
+// --- Art ---
+
+function background(){
+ const grad=ctx.createLinearGradient(0,0,0,H);
+ grad.addColorStop(0,level.sky);grad.addColorStop(1,"#e1e6e4");
+ ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+
+ // Distant mountain silhouettes.
+ for(let layer=0;layer<2;layer++){
+  const parallax=layer?.32:.13;
+  const step=layer?220:280;
+  ctx.fillStyle=layer?level.near:level.far;
+  ctx.globalAlpha=layer?.65:.7;
+  ctx.beginPath();ctx.moveTo(0,H);
+  for(let x=-step;x<W+step;x+=step){
+   const px=x-(camera*parallax%step);
+   ctx.lineTo(px,300+Math.sin(x*.02+layer)*45+layer*55);
+   ctx.lineTo(px+step*.5,180+Math.cos(x*.01)*40+layer*65);
+   ctx.lineTo(px+step,330+Math.sin(x*.03)*25+layer*45);
   }
+  ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+ }
+ ctx.globalAlpha=1;
 
-  function update(dt) {
-    elapsed += dt;
+ // Small, slowly moving clouds.
+ ctx.fillStyle="rgba(255,255,255,.3)";
+ for(let i=0;i<7;i++){
+  let x=((i*177-time*5-camera*.06)%(W+200)+W+200)%(W+200)-80;
+  let y=55+(i%4)*39;
+  ctx.beginPath();ctx.ellipse(x,y,34,10,0,0,Math.PI*2);ctx.fill();
+ }
+}
 
-    if (gameState !== "playing") return;
+function platform(p){
+ const x=p[0]-camera,y=p[1],w=p[2],h=p[3];
+ ctx.fillStyle="#354052";ctx.fillRect(x,y,w,h);
+ ctx.fillStyle=level.near;ctx.fillRect(x,y+7,w,Math.max(0,h-7));
+ ctx.fillStyle="#a2c8a4";ctx.fillRect(x,y,w,4);
+ ctx.fillStyle="rgba(7,15,25,.2)";
+ for(let xx=x+12;xx<x+w;xx+=32)ctx.fillRect(xx,y+20,12,3);
+ // A few hanging roots on tall platforms.
+ if(h>50){
+  ctx.fillStyle="#263c3b";
+  for(let xx=x+22;xx<x+w-10;xx+=47)ctx.fillRect(xx,y+8,2,Math.min(12,h-10));
+ }
+}
 
-    player.invulnerable = Math.max(0, player.invulnerable - dt);
+function spike(s){
+ const x=s[0]-camera,y=s[1],w=s[2],h=s[3];
+ const n=Math.ceil(w/17);
+ for(let i=0;i<n;i++){
+  const xx=x+i*w/n,sw=w/n;
+  ctx.fillStyle="#b8c7d3";
+  ctx.beginPath();ctx.moveTo(xx,y+h);ctx.lineTo(xx+sw/2,y+2);ctx.lineTo(xx+sw,y+h);ctx.closePath();ctx.fill();
+  ctx.strokeStyle="#647487";ctx.lineWidth=1;ctx.stroke();
+ }
+}
 
-    if (keys.jump && !previousJump) jumpBuffer = 0.13;
-    previousJump = keys.jump;
-    jumpBuffer = Math.max(0, jumpBuffer - dt);
+function coin(c){
+ if(c.got)return;
+ const x=c.x-camera,y=c.y+Math.sin(time*3+c.phase)*4;
+ ctx.fillStyle="rgba(255,213,113,.2)";
+ ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#f4c86b";
+ ctx.beginPath();ctx.ellipse(x,y,7,11,0,0,Math.PI*2);ctx.fill();
+ ctx.strokeStyle="#fff1b5";ctx.lineWidth=2;ctx.stroke();
+ ctx.fillStyle="#9e7138";ctx.fillRect(x-1,y-5,2,10);
+}
 
-    player.vx = (Number(keys.right) - Number(keys.left)) * player.speed;
+function enemy(e){
+ if(!e.alive)return;
+ const x=e.x-camera,y=e.y;
+ if(e.type==="walker"){
+  ctx.fillStyle="#4b294d";ctx.fillRect(x+3,y+9,24,19);
+  ctx.fillStyle="#a16b98";ctx.fillRect(x+5,y+4,20,18);
+  ctx.fillStyle="#f3d9e9";ctx.fillRect(x+8,y+9,4,5);ctx.fillRect(x+19,y+9,4,5);
+  ctx.fillStyle="#281f3b";ctx.fillRect(x+9,y+10,2,3);ctx.fillRect(x+20,y+10,2,3);
+  ctx.fillStyle="#4b294d";ctx.fillRect(x+5,y+27,7,5);ctx.fillRect(x+20,y+27,7,5);
+ }else if(e.type==="hopper"){
+  const bounce=Math.max(0,-e.vy*.025);
+  ctx.fillStyle="#394f3e";ctx.fillRect(x+3,y+10+bounce,24,19-bounce);
+  ctx.fillStyle="#a3ce91";ctx.fillRect(x+6,y+3+bounce,18,17);
+  ctx.fillStyle="#263a35";ctx.fillRect(x+9,y+8+bounce,4,5);ctx.fillRect(x+19,y+8+bounce,4,5);
+  ctx.fillStyle="#56794e";ctx.fillRect(x+2,y+26,9,5);ctx.fillRect(x+20,y+26,9,5);
+ }else{
+  ctx.fillStyle="rgba(180,220,255,.2)";
+  ctx.beginPath();ctx.ellipse(x+15,y+15,25,20,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#526d91";ctx.beginPath();ctx.ellipse(x+15,y+15,13,10,0,0,Math.PI*2);ctx.fill();
+  const wing=Math.sin(time*12+e.phase)*8;
+  ctx.fillStyle="#9dbbd9";
+  ctx.beginPath();ctx.moveTo(x+10,y+12);ctx.lineTo(x-4,y+3-wing);ctx.lineTo(x+5,y+22);ctx.fill();
+  ctx.beginPath();ctx.moveTo(x+20,y+12);ctx.lineTo(x+34,y+3+wing);ctx.lineTo(x+25,y+22);ctx.fill();
+  ctx.fillStyle="#eaf4ff";ctx.fillRect(x+9,y+11,4,4);ctx.fillRect(x+19,y+11,4,4);
+ }
+}
 
-    if (player.grounded) coyoteTime = 0.12;
-    else coyoteTime = Math.max(0, coyoteTime - dt);
+function flag(){
+ const x=level.cp[0]-camera,y=level.cp[1];
+ ctx.fillStyle="#334357";ctx.fillRect(x,y,4,70);
+ ctx.fillStyle=checkpointSaved?"#a8f5d1":"#f0d8a0";
+ ctx.beginPath();ctx.moveTo(x+4,y+2);ctx.lineTo(x+32,y+12);ctx.lineTo(x+4,y+23);ctx.fill();
+ if(checkpointSaved){
+  ctx.strokeStyle="rgba(168,245,209,.4)";ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(x+6,y+15,25+Math.sin(time*3)*3,0,Math.PI*2);ctx.stroke();
+ }
+}
 
-    if (jumpBuffer > 0 && coyoteTime > 0) {
-      player.vy = -player.jump;
-      player.grounded = false;
-      coyoteTime = 0;
-      jumpBuffer = 0;
-    }
+function portal(){
+ const x=level.goal[0]-camera,y=level.goal[1];
+ const pulse=Math.sin(time*2)*2;
+ ctx.fillStyle="rgba(163,143,255,.12)";
+ ctx.beginPath();ctx.ellipse(x+20,y+40,30+pulse,45+pulse,0,0,Math.PI*2);ctx.fill();
+ ctx.strokeStyle="#c1b0ff";ctx.lineWidth=5;
+ ctx.beginPath();ctx.ellipse(x+20,y+40,17,35,0,0,Math.PI*2);ctx.stroke();
+ ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=2;
+ ctx.beginPath();ctx.ellipse(x+20,y+40,10,28,0,0,Math.PI*2);ctx.stroke();
+}
 
-    player.vy += 1800 * dt;
-    player.vy = Math.min(player.vy, 1000);
+function hero(){
+ if(player.invuln>0&&Math.floor(time*13)%2===0)return;
+ const x=player.x-camera,y=player.y;
+ const run=Math.sin(player.run)*3;
+ ctx.fillStyle="#26344a";ctx.fillRect(x+5,y+10,19,26);
+ ctx.fillStyle="#b8f0d5";ctx.fillRect(x+3,y+5,21,23);
+ ctx.fillStyle="#e9fff5";ctx.fillRect(x+6,y+8,15,13);
+ ctx.fillStyle="#283c50";
+ const eye=player.face>0?17:8;
+ ctx.fillRect(x+eye,y+12,3,5);
+ ctx.fillStyle="#4d7e78";
+ ctx.fillRect(x+5,y+29,7,7+run);
+ ctx.fillRect(x+16,y+29,7,7-run);
+ // Small scarf.
+ ctx.fillStyle="#dfad72";
+ ctx.fillRect(x+(player.face>0?1:21),y+11,6,4);
+}
 
-    // Horizontal collision.
-    player.x += player.vx * dt;
-    for (const p of platforms) {
-      if (rectsOverlap(player, {x:p[0],y:p[1],w:p[2],h:p[3]})) {
-        if (player.vx > 0) player.x = p[0] - player.w;
-        else if (player.vx < 0) player.x = p[0] + p[2];
-      }
-    }
+function drawParticles(){
+ for(const p of particles){
+  ctx.globalAlpha=Math.max(0,p.life/p.max);
+  ctx.fillStyle=p.color;ctx.fillRect(p.x-camera,p.y,p.size,p.size);
+ }
+ ctx.globalAlpha=1;
+}
 
-    // Vertical collision.
-    const oldY = player.y;
-    player.y += player.vy * dt;
-    player.grounded = false;
+function overlay(title,subtitle,items=[]){
+ ctx.fillStyle="rgba(11,17,30,.76)";ctx.fillRect(0,0,W,H);
+ ctx.textAlign="center";
+ ctx.fillStyle="#e0f9ed";ctx.font="bold 52px system-ui";
+ ctx.fillText(title,W/2,155);
+ ctx.fillStyle="#a9bcd0";ctx.font="16px system-ui";
+ ctx.fillText(subtitle,W/2,192);
+ items.forEach((item,i)=>{
+  ctx.fillStyle=i===menuSelection?"#c4f4dc":"#d0d9e6";
+  ctx.font=i===menuSelection?"bold 23px system-ui":"20px system-ui";
+  ctx.fillText((i===menuSelection?"›  ":"")+item,W/2,270+i*48);
+ });
+ ctx.fillStyle="#92a5bc";ctx.font="13px system-ui";
+ ctx.fillText("A SMALL ADVENTURE ABOUT TIMING AND DISCOVERY",W/2,480);
+ ctx.textAlign="left";
+}
 
-    for (const p of platforms) {
-      const platform = {x:p[0],y:p[1],w:p[2],h:p[3]};
-      if (!rectsOverlap(player, platform)) continue;
+function render(){
+ background();
+ for(const p of platforms)platform(p);
+ for(const s of spikes)spike(s);
+ for(const c of coins)coin(c);
+ for(const e of enemies)enemy(e);
+ flag();portal();hero();drawParticles();
 
-      if (player.vy > 0 && oldY + player.h <= p[1] + 8) {
-        player.y = p[1] - player.h;
-        player.vy = 0;
-        player.grounded = true;
-      } else if (player.vy < 0 && oldY >= p[1] + p[3] - 4) {
-        player.y = p[1] + p[3];
-        player.vy = 0;
-      }
-    }
-
-    // Enemies patrol and can be defeated by landing on top.
-    for (const e of enemies) {
-      if (!e.alive) continue;
-      e.x += e.dir * e.speed * dt;
-
-      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
-      if (e.x + e.w > e.maxX) { e.x = e.maxX - e.w; e.dir = -1; }
-
-      if (rectsOverlap(player, e)) {
-        if (player.vy > 0 && oldY + player.h <= e.y + 13) {
-          e.alive = false;
-          player.y = e.y - player.h;
-          player.vy = -360;
-          totalCoins += 1;
-          updateHUD();
-        } else {
-          die();
-        }
-      }
-    }
-
-    // Spikes.
-    for (const s of spikes) {
-      if (rectsOverlap(player, {x:s[0],y:s[1],w:s[2],h:s[3]})) die();
-    }
-
-    // Coins.
-    for (const c of coins) {
-      if (c.collected) continue;
-      const coinBox = {x:c.x-10,y:c.y-10,w:20,h:20};
-      if (rectsOverlap(player, coinBox)) {
-        c.collected = true;
-        totalCoins++;
-        updateHUD();
-      }
-    }
-
-    // Checkpoint.
-    const cp = levelData.checkpoint;
-    if (!checkpointReached &&
-        rectsOverlap(player, {x:cp[0],y:cp[1],w:24,h:70})) {
-      checkpointReached = true;
-      checkpointX = cp[0];
-      checkpointY = cp[1] - player.h;
-      ui.message.textContent = "Checkpoint saved!";
-      updateHUD();
-    }
-
-    // Portal.
-    const g = levelData.goal;
-    if (rectsOverlap(player, {x:g[0],y:g[1],w:40,h:80})) {
-      nextLevel();
-      return;
-    }
-
-    if (player.y > H + 250) die();
-
-    // Camera follows the player but stays within the level.
-    cameraX = Math.max(0, Math.min(
-      levelData.width - W,
-      player.x - W * 0.38
-    ));
+ if(state==="menu"){
+  overlay("PIXELBOUND","A journey through forgotten worlds",["PLAY","CONTROLS"]);
+  if(menuSelection===1){
+   ctx.fillStyle="rgba(11,17,30,.93)";ctx.fillRect(215,325,530,105);
+   ctx.textAlign="center";ctx.fillStyle="#e8f2ff";ctx.font="16px system-ui";
+   ctx.fillText("MOVE: A / D or ARROW KEYS",480,355);
+   ctx.fillText("JUMP: W / UP / SPACE",480,382);
+   ctx.fillText("LAND ON ENEMIES TO DEFEAT THEM",480,409);
+   ctx.textAlign="left";
   }
+ }else if(state==="paused"){
+  overlay("PAUSED","Take a breather",["RESUME","RESTART"]);
+ }else if(state==="dead"){
+  overlay("GAME OVER","Your journey has ended",["TRY AGAIN","MAIN MENU"]);
+ }else if(state==="victory"){
+  overlay("JOURNEY COMPLETE","You crossed all three worlds",["PLAY AGAIN","MAIN MENU"]);
+ }
+}
 
-  function drawBackground() {
-    const gradient = ctx.createLinearGradient(0,0,0,H);
-    gradient.addColorStop(0, "#65b9f4");
-    gradient.addColorStop(1, "#d6f6ff");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0,0,W,H);
+function frame(now){
+ const dt=Math.min((now-last)/1000||0,.025);last=now;
+ update(dt);render();requestAnimationFrame(frame);
+}
 
-    // Parallax mountains.
-    for (let i=0; i<9; i++) {
-      const x = i * 180 - (cameraX * 0.2 % 180);
-      ctx.fillStyle = i % 2 ? "#8baad0" : "#9bbbdc";
-      ctx.beginPath();
-      ctx.moveTo(x,400);
-      ctx.lineTo(x+90,210+(i%3)*35);
-      ctx.lineTo(x+200,400);
-      ctx.fill();
-    }
+function menuAction(){
+ if(state==="menu"){
+  if(menuSelection===0)startGame();
+  else menuSelection=0;
+ }else if(state==="paused"){
+  if(menuSelection===0)state="playing";
+  else startGame();
+ }else if(state==="dead"){
+  if(menuSelection===0)startGame();
+  else{state="menu";menuSelection=0;}
+ }else if(state==="victory"){
+  if(menuSelection===0)startGame();
+  else{state="menu";menuSelection=0;}
+ }
+}
 
-    // Clouds.
-    ctx.fillStyle = "rgba(255,255,255,.7)";
-    for (let i=0; i<8; i++) {
-      const x = (i*190 - cameraX*0.12) % (W+160);
-      const cx = (x + W + 160) % (W+160) - 60;
-      const y = 60 + (i%3)*48;
-      ctx.beginPath();
-      ctx.arc(cx,y,22,0,Math.PI*2);
-      ctx.arc(cx+24,y-9,28,0,Math.PI*2);
-      ctx.arc(cx+52,y,20,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
+window.addEventListener("keydown",e=>{
+ const k=e.key.toLowerCase();
+ if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();
+ if(k==="a"||k==="arrowleft")keys.left=true;
+ if(k==="d"||k==="arrowright")keys.right=true;
+ if(k==="w"||k==="arrowup"||k===" ")keys.jump=true;
 
-  function drawPlatform(p) {
-    const x=p[0]-cameraX, y=p[1], w=p[2], h=p[3];
-    ctx.fillStyle = "#674b39";
-    ctx.fillRect(x,y,w,h);
-    ctx.fillStyle = "#52b95d";
-    ctx.fillRect(x,y,w,8);
-    ctx.fillStyle = "#82e477";
-    ctx.fillRect(x,y,w,3);
+ if(k==="escape"){
+  if(state==="playing"){state="paused";menuSelection=0;}
+  else if(state==="paused")state="playing";
+ }
+ if(state!=="playing"&&(k==="arrowup"||k==="w"))menuSelection=Math.max(0,menuSelection-1);
+ if(state!=="playing"&&(k==="arrowdown"||k==="s"))menuSelection=Math.min(1,menuSelection+1);
+ if(state!=="playing"&&(k==="enter"||k===" "))menuAction();
+ if(k==="r"&&state!=="menu")startGame();
+});
+window.addEventListener("keyup",e=>{
+ const k=e.key.toLowerCase();
+ if(k==="a"||k==="arrowleft")keys.left=false;
+ if(k==="d"||k==="arrowright")keys.right=false;
+ if(k==="w"||k==="arrowup"||k===" ")keys.jump=false;
+});
+window.addEventListener("blur",()=>{keys.left=keys.right=keys.jump=false;});
 
-    ctx.fillStyle = "rgba(30,30,40,.12)";
-    for (let bx=x+10; bx<x+w; bx+=30) {
-      ctx.fillRect(bx,y+22,12,5);
-    }
-  }
+document.querySelectorAll("[data-key]").forEach(btn=>{
+ const k=btn.dataset.key;
+ const release=()=>keys[k]=false;
+ btn.addEventListener("pointerdown",e=>{
+  e.preventDefault();keys[k]=true;btn.setPointerCapture(e.pointerId);
+ });
+ btn.addEventListener("pointerup",release);
+ btn.addEventListener("pointercancel",release);
+ btn.addEventListener("lostpointercapture",release);
+});
 
-  function drawSpike(s) {
-    const x=s[0]-cameraX, y=s[1], w=s[2], h=s[3];
-    ctx.fillStyle = "#e9f0f5";
-    ctx.fillRect(x,y+h-4,w,4);
-    const count = Math.max(1,Math.floor(w/18));
-    ctx.fillStyle = "#d94c64";
-    for (let i=0; i<count; i++) {
-      const sx=x+i*w/count, sw=w/count;
-      ctx.beginPath();
-      ctx.moveTo(sx,y+h);
-      ctx.lineTo(sx+sw/2,y);
-      ctx.lineTo(sx+sw,y+h);
-      ctx.fill();
-    }
-    ctx.strokeStyle="#a52c48";
-    ctx.lineWidth=2;
-    ctx.strokeRect(x,y+h-4,w,4);
-  }
-
-  function drawCoin(c) {
-    if (c.collected) return;
-    const x=c.x-cameraX;
-    const y=c.y+Math.sin(elapsed*4+c.phase)*4;
-    ctx.fillStyle="#ffb52e";
-    ctx.beginPath();
-    ctx.ellipse(x,y,9,12,0,0,Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle="#fff2a3";
-    ctx.lineWidth=3;
-    ctx.stroke();
-    ctx.fillStyle="#fff4b4";
-    ctx.fillRect(x-2,y-7,3,8);
-  }
-
-  function drawEnemy(e) {
-    if (!e.alive) return;
-    const x=e.x-cameraX, y=e.y;
-    ctx.fillStyle="#6d2b87";
-    ctx.fillRect(x,y+8,e.w,e.h-8);
-    ctx.fillStyle="#9d4cc1";
-    ctx.fillRect(x+4,y+3,e.w-8,20);
-    ctx.fillStyle="#ffffff";
-    ctx.fillRect(x+5,y+10,7,8);
-    ctx.fillRect(x+20,y+10,7,8);
-    ctx.fillStyle="#222038";
-    ctx.fillRect(x+8,y+12,3,5);
-    ctx.fillRect(x+22,y+12,3,5);
-    ctx.fillStyle="#f1a3ff";
-    ctx.fillRect(x+5,y+e.h-3,8,5);
-    ctx.fillRect(x+21,y+e.h-3,8,5);
-  }
-
-  function drawCheckpoint() {
-    const cp=levelData.checkpoint;
-    const x=cp[0]-cameraX, y=cp[1];
-    ctx.fillStyle="#39465f";
-    ctx.fillRect(x,y,5,70);
-    ctx.fillStyle=checkpointReached?"#7cf5cf":"#ffe28a";
-    ctx.beginPath();
-    ctx.moveTo(x+5,y);
-    ctx.lineTo(x+34,y+12);
-    ctx.lineTo(x+5,y+24);
-    ctx.fill();
-    if (checkpointReached) {
-      ctx.fillStyle="rgba(124,245,207,.3)";
-      ctx.beginPath();
-      ctx.arc(x+12,y+22,30,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-  function drawGoal() {
-    const g=levelData.goal;
-    const x=g[0]-cameraX, y=g[1];
-    const pulse=1+Math.sin(elapsed*4)*.07;
-
-    ctx.fillStyle="rgba(115,75,255,.25)";
-    ctx.beginPath();
-    ctx.ellipse(x+20,y+38,32*pulse,46*pulse,0,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.strokeStyle="#7655ff";
-    ctx.lineWidth=7;
-    ctx.beginPath();
-    ctx.ellipse(x+20,y+40,19,35,0,0,Math.PI*2);
-    ctx.stroke();
-
-    ctx.strokeStyle="#c8a5ff";
-    ctx.lineWidth=3;
-    ctx.beginPath();
-    ctx.ellipse(x+20,y+40,12,29,0,0,Math.PI*2);
-    ctx.stroke();
-  }
-
-  function drawPlayer() {
-    if (player.invulnerable > 0 &&
-        Math.floor(elapsed*12)%2===0) return;
-
-    const x=player.x-cameraX, y=player.y;
-    ctx.fillStyle="#27334f";
-    ctx.fillRect(x+4,y+8,player.w-8,player.h-8);
-    ctx.fillStyle="#7cf5cf";
-    ctx.fillRect(x+2,y+6,player.w-4,player.h-12);
-    ctx.fillStyle="#eaffff";
-    ctx.fillRect(x+5,y+9,player.w-10,12);
-    ctx.fillStyle="#263751";
-    ctx.fillRect(x+9,y+12,4,5);
-    ctx.fillRect(x+18,y+12,4,5);
-
-    ctx.fillStyle="#35466b";
-    const step=player.grounded && Math.abs(player.vx)>0
-      ? Math.sin(elapsed*18)*3 : 0;
-    ctx.fillRect(x+4,y+player.h-4,8,7+step);
-    ctx.fillRect(x+17,y+player.h-4,8,7-step);
-  }
-
-  function drawOverlay(title, subtitle) {
-    ctx.fillStyle="rgba(13,19,39,.78)";
-    ctx.fillRect(0,0,W,H);
-    ctx.textAlign="center";
-    ctx.fillStyle="#7cf5cf";
-    ctx.font="bold 48px system-ui";
-    ctx.fillText(title,W/2,H/2-25);
-    ctx.fillStyle="#ffffff";
-    ctx.font="20px system-ui";
-    ctx.fillText(subtitle,W/2,H/2+22);
-    ctx.textAlign="left";
-  }
-
-  function render() {
-    drawBackground();
-
-    ctx.save();
-    for (const p of platforms) drawPlatform(p);
-    for (const s of spikes) drawSpike(s);
-    for (const c of coins) drawCoin(c);
-    for (const e of enemies) drawEnemy(e);
-    drawCheckpoint();
-    drawGoal();
-    drawPlayer();
-    ctx.restore();
-
-    if (gameState==="gameover") {
-      drawOverlay("GAME OVER","Press R or RESTART to try again");
-    } else if (gameState==="won") {
-      drawOverlay("YOU WIN!","All levels complete! Press R to play again");
-    }
-  }
-
-  function frame(time) {
-    const dt=Math.min((time-lastTime)/1000 || 0,0.033);
-    lastTime=time;
-    update(dt);
-    render();
-    requestAnimationFrame(frame);
-  }
-
-  function restartGame() {
-    lives=3;
-    totalCoins=0;
-    elapsed=0;
-    previousJump=false;
-    jumpBuffer=0;
-    loadLevel(0);
-  }
-
-  // Keyboard controls.
-  window.addEventListener("keydown", e => {
-    const k=e.key.toLowerCase();
-
-    if (["arrowleft","arrowright","arrowup"," "].includes(k))
-      e.preventDefault();
-
-    if (k==="a" || k==="arrowleft") keys.left=true;
-    if (k==="d" || k==="arrowright") keys.right=true;
-    if (k==="w" || k==="arrowup" || k===" ") keys.jump=true;
-    if (k==="r") restartGame();
-  });
-
-  window.addEventListener("keyup", e => {
-    const k=e.key.toLowerCase();
-    if (k==="a" || k==="arrowleft") keys.left=false;
-    if (k==="d" || k==="arrowright") keys.right=false;
-    if (k==="w" || k==="arrowup" || k===" ") keys.jump=false;
-  });
-
-  // Touch controls. Holding a button holds the corresponding action.
-  document.querySelectorAll("[data-key]").forEach(button => {
-    const key=button.dataset.key;
-    const release=() => { keys[key]=false; };
-
-    button.addEventListener("pointerdown", e => {
-      e.preventDefault();
-      keys[key]=true;
-      button.setPointerCapture(e.pointerId);
-    });
-    button.addEventListener("pointerup", release);
-    button.addEventListener("pointercancel", release);
-    button.addEventListener("lostpointercapture", release);
-  });
-
-  window.addEventListener("blur", () => {
-    keys.left=keys.right=keys.jump=false;
-  });
-
-  document.getElementById("restart").addEventListener("click",restartGame);
-
-  loadLevel(0);
-  requestAnimationFrame(frame);
+makeLevel(0);
+state="menu";
+requestAnimationFrame(frame);
 })();
 </script>
 </body>
